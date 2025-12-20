@@ -1,6 +1,6 @@
 # Calorie Tracker
 
-A simple calorie tracking application that helps you monitor your daily food intake and reach your nutritional goals.
+A simple calorie tracking application that helps you monitor your daily food intake and reach your nutritional goals. (Web & Mobile)
 
 ## Features
 
@@ -13,7 +13,7 @@ A simple calorie tracking application that helps you monitor your daily food int
 
 - React
 - Vite
-- Tailwind CSS
+- Tailwind CSS, DaisyUI
 - Supabase
 
 ## Self-Hosting
