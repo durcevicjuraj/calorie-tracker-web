@@ -11,6 +11,14 @@ interface UserGoals {
   daily_fat_goal: number
 }
 
+interface DailyTotals {
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  mealsLogged: number
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
@@ -21,10 +29,18 @@ export default function Dashboard() {
     daily_carbs_goal: 250,
     daily_fat_goal: 65,
   })
+  const [totals, setTotals] = useState<DailyTotals>({
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+    mealsLogged: 0,
+  })
 
   useEffect(() => {
     if (user) {
       fetchGoals()
+      fetchTodaysTotals()
     }
   }, [user])
 
@@ -48,6 +64,151 @@ export default function Dashboard() {
     } catch (e) {
       // Use default goals if none set
     }
+  }
+
+  async function fetchTodaysTotals() {
+    try {
+      // Get today's date range
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+
+      // Fetch today's consumption
+      const { data: consumptionData, error } = await supabase
+        .from('user_consumption')
+        .select(`
+          *,
+          meals (
+            id,
+            name,
+            meal_foods (
+              quantity,
+              unit,
+              foods (
+                id,
+                name,
+                ingredient_id,
+                is_composite,
+                ingredients (
+                  calories,
+                  protein,
+                  carbs,
+                  fat,
+                  serving_size
+                ),
+                food_ingredients (
+                  quantity,
+                  unit,
+                  ingredients (
+                    calories,
+                    protein,
+                    carbs,
+                    fat,
+                    serving_size
+                  )
+                )
+              )
+            )
+          ),
+          foods (
+            id,
+            name,
+            ingredient_id,
+            is_composite,
+            ingredients (
+              calories,
+              protein,
+              carbs,
+              fat,
+              serving_size
+            ),
+            food_ingredients (
+              quantity,
+              unit,
+              ingredients (
+                calories,
+                protein,
+                carbs,
+                fat,
+                serving_size
+              )
+            )
+          )
+        `)
+        .eq('user_id', user?.id)
+        .gte('consumed_at', today.toISOString())
+        .lt('consumed_at', tomorrow.toISOString())
+
+      if (error) throw error
+
+      let totalCalories = 0
+      let totalProtein = 0
+      let totalCarbs = 0
+      let totalFat = 0
+
+      // Calculate totals from consumption data
+      consumptionData?.forEach((entry: any) => {
+        const consumedQuantity = entry.quantity
+
+        if (entry.meal_id && entry.meals) {
+          // Calculate for meals
+          entry.meals.meal_foods?.forEach((mf: any) => {
+            if (mf.foods) {
+              const foodNutrition = calculateFoodNutrition(mf.foods)
+              const multiplier = (mf.quantity / 100) * consumedQuantity
+              totalCalories += foodNutrition.calories * multiplier
+              totalProtein += foodNutrition.protein * multiplier
+              totalCarbs += foodNutrition.carbs * multiplier
+              totalFat += foodNutrition.fat * multiplier
+            }
+          })
+        } else if (entry.food_id && entry.foods) {
+          // Calculate for individual foods
+          const foodNutrition = calculateFoodNutrition(entry.foods)
+          totalCalories += foodNutrition.calories * consumedQuantity
+          totalProtein += foodNutrition.protein * consumedQuantity
+          totalCarbs += foodNutrition.carbs * consumedQuantity
+          totalFat += foodNutrition.fat * consumedQuantity
+        }
+      })
+
+      setTotals({
+        calories: Math.round(totalCalories),
+        protein: Math.round(totalProtein),
+        carbs: Math.round(totalCarbs),
+        fat: Math.round(totalFat),
+        mealsLogged: consumptionData?.length || 0,
+      })
+    } catch (e) {
+      console.error('Error fetching totals:', e)
+    }
+  }
+
+  function calculateFoodNutrition(food: any) {
+    if (food.is_composite) {
+      // Composite food: sum all ingredients
+      let calories = 0, protein = 0, carbs = 0, fat = 0
+      food.food_ingredients?.forEach((fi: any) => {
+        if (fi.ingredients) {
+          const multiplier = fi.quantity / 100
+          calories += fi.ingredients.calories * multiplier
+          protein += fi.ingredients.protein * multiplier
+          carbs += fi.ingredients.carbs * multiplier
+          fat += fi.ingredients.fat * multiplier
+        }
+      })
+      return { calories, protein, carbs, fat }
+    } else if (food.ingredients) {
+      // Simple food: get from ingredient
+      return {
+        calories: food.ingredients.calories,
+        protein: food.ingredients.protein,
+        carbs: food.ingredients.carbs,
+        fat: food.ingredients.fat,
+      }
+    }
+    return { calories: 0, protein: 0, carbs: 0, fat: 0 }
   }
 
   return (
@@ -135,14 +296,14 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm font-medium opacity-60">Calories</p>
                   <div className="flex items-baseline gap-2 mt-2">
-                    <p className="text-3xl font-bold">0</p>
+                    <p className="text-3xl font-bold">{totals.calories}</p>
                     <p className="text-sm opacity-60">/ {goals.daily_calorie_goal} kcal</p>
                   </div>
                 </div>
                 <div className="badge badge-primary badge-sm">Today</div>
               </div>
-              <progress className="progress progress-primary" value="0" max="100"></progress>
-              <p className="text-xs opacity-60 mt-2">0% of daily goal</p>
+              <progress className="progress progress-primary" value={Math.min((totals.calories / goals.daily_calorie_goal) * 100, 100)} max="100"></progress>
+              <p className="text-xs opacity-60 mt-2">{Math.round((totals.calories / goals.daily_calorie_goal) * 100)}% of daily goal</p>
             </div>
           </div>
 
@@ -152,12 +313,12 @@ export default function Dashboard() {
               <div className="mb-4">
                 <p className="text-sm font-medium opacity-60">Protein</p>
                 <div className="flex items-baseline gap-2 mt-2">
-                  <p className="text-3xl font-bold">0</p>
+                  <p className="text-3xl font-bold">{totals.protein}</p>
                   <p className="text-sm opacity-60">/ {goals.daily_protein_goal}g</p>
                 </div>
               </div>
-              <progress className="progress progress-success" value="0" max="100"></progress>
-              <p className="text-xs opacity-60 mt-2">0% of daily goal</p>
+              <progress className="progress progress-success" value={Math.min((totals.protein / goals.daily_protein_goal) * 100, 100)} max="100"></progress>
+              <p className="text-xs opacity-60 mt-2">{Math.round((totals.protein / goals.daily_protein_goal) * 100)}% of daily goal</p>
             </div>
           </div>
 
@@ -167,7 +328,7 @@ export default function Dashboard() {
               <div className="mb-4">
                 <p className="text-sm font-medium opacity-60">Meals Logged</p>
                 <div className="flex items-baseline gap-2 mt-2">
-                  <p className="text-3xl font-bold">0</p>
+                  <p className="text-3xl font-bold">{totals.mealsLogged}</p>
                   <p className="text-sm opacity-60">meals</p>
                 </div>
               </div>
@@ -188,23 +349,23 @@ export default function Dashboard() {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-medium">Protein</span>
-                  <span className="text-sm opacity-60">0 / {goals.daily_protein_goal}g</span>
+                  <span className="text-sm opacity-60">{totals.protein} / {goals.daily_protein_goal}g</span>
                 </div>
-                <progress className="progress progress-success w-full" value="0" max="100"></progress>
+                <progress className="progress progress-success w-full" value={Math.min((totals.protein / goals.daily_protein_goal) * 100, 100)} max="100"></progress>
               </div>
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-medium">Carbs</span>
-                  <span className="text-sm opacity-60">0 / {goals.daily_carbs_goal}g</span>
+                  <span className="text-sm opacity-60">{totals.carbs} / {goals.daily_carbs_goal}g</span>
                 </div>
-                <progress className="progress progress-warning w-full" value="0" max="100"></progress>
+                <progress className="progress progress-warning w-full" value={Math.min((totals.carbs / goals.daily_carbs_goal) * 100, 100)} max="100"></progress>
               </div>
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-medium">Fats</span>
-                  <span className="text-sm opacity-60">0 / {goals.daily_fat_goal}g</span>
+                  <span className="text-sm opacity-60">{totals.fat} / {goals.daily_fat_goal}g</span>
                 </div>
-                <progress className="progress progress-info w-full" value="0" max="100"></progress>
+                <progress className="progress progress-info w-full" value={Math.min((totals.fat / goals.daily_fat_goal) * 100, 100)} max="100"></progress>
               </div>
             </div>
           </div>
@@ -215,20 +376,29 @@ export default function Dashboard() {
           <div className="card-body">
             <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <button className="btn btn-primary">
+              <button
+                className="btn btn-primary"
+                onClick={() => navigate('/log-meal')}
+              >
                 + Log Meal
               </button>
               <button
                 className="btn btn-outline"
-                onClick={() => navigate('/add-ingredient')}
+                onClick={() => navigate('/add-meal')}
               >
-                + Add Ingredient
+                + Add Meal
               </button>
               <button
                 className="btn btn-outline"
                 onClick={() => navigate('/add-food')}
               >
                 + Add Food
+              </button>
+              <button
+                className="btn btn-outline"
+                onClick={() => navigate('/add-ingredient')}
+              >
+                + Add Ingredient
               </button>
               <button className="btn btn-outline">
                 View Stats

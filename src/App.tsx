@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import Auth from './pages/Auth'
 import Dashboard from './pages/Dashboard'
+import LogMeal from './pages/LogMeal'
+import AddMeal from './pages/AddMeal'
 import AddFood from './pages/AddFood'
 import AddIngredient from './pages/AddIngredient'
 
@@ -24,8 +26,10 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/add-ingredient" element={<AddIngredient />} />
+        <Route path="/log-meal" element={<LogMeal />} />
+        <Route path="/add-meal" element={<AddMeal />} />
         <Route path="/add-food" element={<AddFood />} />
+        <Route path="/add-ingredient" element={<AddIngredient />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
