@@ -55,16 +55,27 @@ CREATE INDEX idx_ingredients_category ON ingredients(category_id);
 CREATE TABLE foods (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
+  brand_name TEXT DEFAULT NULL,
   category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
   is_composite BOOLEAN DEFAULT FALSE,
   -- If simple food, reference the ingredient
   ingredient_id UUID REFERENCES ingredients(id) ON DELETE SET NULL,
+  -- Nutritional data (for direct food entry)
+  serving_size TEXT DEFAULT '100g',
+  calories DECIMAL(10, 2) DEFAULT 0,
+  protein DECIMAL(10, 2) DEFAULT 0,
+  carbs DECIMAL(10, 2) DEFAULT 0,
+  fat DECIMAL(10, 2) DEFAULT 0,
+  fiber DECIMAL(10, 2) DEFAULT NULL,
+  -- Image
+  image_url TEXT DEFAULT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  CONSTRAINT simple_food_has_ingredient CHECK (
-    (is_composite = FALSE AND ingredient_id IS NOT NULL) OR
-    (is_composite = TRUE AND ingredient_id IS NULL)
-  )
+  CONSTRAINT calories_positive CHECK (calories >= 0),
+  CONSTRAINT protein_positive CHECK (protein >= 0),
+  CONSTRAINT carbs_positive CHECK (carbs >= 0),
+  CONSTRAINT fat_positive CHECK (fat >= 0),
+  CONSTRAINT fiber_positive CHECK (fiber IS NULL OR fiber >= 0)
 );
 
 CREATE INDEX idx_foods_name ON foods(name);
@@ -407,3 +418,33 @@ CREATE TRIGGER update_user_profiles_updated_at
   BEFORE UPDATE ON user_profiles
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- STORAGE BUCKETS
+-- ============================================================================
+
+-- Create storage bucket for food images
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('food-images', 'food-images', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage policies for food images
+CREATE POLICY "Allow authenticated users to upload food images"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'food-images');
+
+CREATE POLICY "Allow public to read food images"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'food-images');
+
+CREATE POLICY "Allow authenticated users to update food images"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (bucket_id = 'food-images');
+
+CREATE POLICY "Allow authenticated users to delete food images"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (bucket_id = 'food-images');
