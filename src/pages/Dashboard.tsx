@@ -221,15 +221,18 @@ export default function Dashboard() {
 
             <div className="flex items-center gap-6">
               <nav className="hidden md:flex gap-6">
-                <a href="#" className="text-sm font-medium text-primary">
+                <button onClick={() => navigate('/')} className="text-sm font-medium text-primary">
                   Dashboard
-                </a>
-                <a href="#" className="text-sm font-medium opacity-60 hover:opacity-100 transition">
+                </button>
+                <button onClick={() => navigate('/ingredients')} className="text-sm font-medium opacity-60 hover:opacity-100 transition">
+                  Ingredients
+                </button>
+                <button onClick={() => navigate('/foods')} className="text-sm font-medium opacity-60 hover:opacity-100 transition">
                   Foods
-                </a>
-                <a href="#" className="text-sm font-medium opacity-60 hover:opacity-100 transition">
+                </button>
+                <button onClick={() => navigate('/meals')} className="text-sm font-medium opacity-60 hover:opacity-100 transition">
                   Meals
-                </a>
+                </button>
               </nav>
 
               <div className="dropdown dropdown-end">
