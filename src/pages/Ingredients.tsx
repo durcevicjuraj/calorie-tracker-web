@@ -76,6 +76,37 @@ export default function Ingredients() {
                 </button>
               </nav>
 
+              {/* Mobile Menu */}
+              <div className="dropdown dropdown-end md:hidden">
+                <div tabIndex={0} role="button" className="btn btn-ghost btn-square">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="inline-block w-5 h-5 stroke-current">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                  </svg>
+                </div>
+                <ul tabIndex={0} className="mt-3 z-[1] p-2 shadow-lg dropdown-content bg-base-100 rounded-lg w-52 border border-base-300">
+                  <li>
+                    <button onClick={() => navigate('/')} className="block w-full text-left px-4 py-2 text-sm hover:bg-base-200 rounded">
+                      Dashboard
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => navigate('/ingredients')} className="block w-full text-left px-4 py-2 text-sm text-primary hover:bg-base-200 rounded">
+                      Ingredients
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => navigate('/foods')} className="block w-full text-left px-4 py-2 text-sm hover:bg-base-200 rounded">
+                      Foods
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => navigate('/meals')} className="block w-full text-left px-4 py-2 text-sm hover:bg-base-200 rounded">
+                      Meals
+                    </button>
+                  </li>
+                </ul>
+              </div>
+
               <div className="dropdown dropdown-end">
                 <div
                   tabIndex={0}

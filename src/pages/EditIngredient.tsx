@@ -195,6 +195,29 @@ export default function EditIngredient() {
     }
   }
 
+  async function handleDelete() {
+    if (!confirm('Are you sure you want to delete this ingredient? This action cannot be undone.')) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const { error: deleteError } = await supabase
+        .from('ingredients')
+        .delete()
+        .eq('id', id)
+
+      if (deleteError) throw deleteError
+
+      navigate('/ingredients')
+    } catch (e: any) {
+      setError(e.message || 'Failed to delete ingredient')
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-dvh bg-base-200">
       {/* Header */}
@@ -426,22 +449,32 @@ export default function EditIngredient() {
               {error && <p className="text-error text-sm">{error}</p>}
 
               {/* Action Buttons */}
-              <div className="flex gap-3 justify-end mt-4">
+              <div className="flex gap-3 justify-between mt-4">
                 <button
                   type="button"
-                  className="btn"
-                  onClick={() => navigate('/')}
+                  className="btn btn-error"
+                  onClick={handleDelete}
                   disabled={loading}
                 >
-                  Cancel
+                  Delete
                 </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={loading || uploadingImage}
-                >
-                  {uploadingImage ? 'Uploading image...' : loading ? 'Updating...' : 'Update Ingredient'}
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => navigate('/ingredients')}
+                    disabled={loading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={loading || uploadingImage}
+                  >
+                    {uploadingImage ? 'Uploading image...' : loading ? 'Updating...' : 'Update Ingredient'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

@@ -151,6 +151,29 @@ export default function EditMeal() {
     }
   }
 
+  async function handleDelete() {
+    if (!confirm('Are you sure you want to delete this meal? This action cannot be undone.')) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const { error: deleteError } = await supabase
+        .from('meals')
+        .delete()
+        .eq('id', id)
+
+      if (deleteError) throw deleteError
+
+      navigate('/meals')
+    } catch (e: any) {
+      setError(e.message || 'Failed to delete meal')
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-dvh bg-base-200">
       {/* Header */}
@@ -299,22 +322,32 @@ export default function EditMeal() {
               {error && <p className="text-error text-sm">{error}</p>}
 
               {/* Action Buttons */}
-              <div className="flex gap-3 justify-end mt-4">
+              <div className="flex gap-3 justify-between mt-4">
                 <button
                   type="button"
-                  className="btn"
-                  onClick={() => navigate('/')}
+                  className="btn btn-error"
+                  onClick={handleDelete}
                   disabled={loading}
                 >
-                  Cancel
+                  Delete
                 </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={loading || mealFoods.length === 0}
-                >
-                  {loading ? 'Updating...' : 'Update Meal'}
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => navigate('/meals')}
+                    disabled={loading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={loading || mealFoods.length === 0}
+                  >
+                    {loading ? 'Updating...' : 'Update Meal'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

@@ -86,26 +86,15 @@ export default function EditFood() {
 
   async function fetchFood() {
     try {
-      console.log('Fetching food with id:', id)
       const { data, error } = await supabase
         .from('foods')
         .select('*, food_ingredients(ingredient_id, quantity, unit)')
         .eq('id', id)
         .single()
 
-      console.log('Food data received:', data)
-      console.log('Food error:', error)
-
       if (error) throw error
 
       if (data) {
-        console.log('Setting form values:', {
-          name: data.name,
-          category_id: data.category_id,
-          is_composite: data.is_composite,
-          ingredient_id: data.ingredient_id
-        })
-
         setName(data.name)
         setBrandName(data.brand_name || '')
         setCategoryId(data.category_id)
@@ -258,6 +247,29 @@ export default function EditFood() {
     } catch (e: any) {
       setError(e.message || 'Failed to update food')
     } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm('Are you sure you want to delete this food? This action cannot be undone.')) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const { error: deleteError } = await supabase
+        .from('foods')
+        .delete()
+        .eq('id', id)
+
+      if (deleteError) throw deleteError
+
+      navigate('/foods')
+    } catch (e: any) {
+      setError(e.message || 'Failed to delete food')
       setLoading(false)
     }
   }
@@ -497,22 +509,32 @@ export default function EditFood() {
               {error && <p className="text-error text-sm">{error}</p>}
 
               {/* Action Buttons */}
-              <div className="flex gap-3 justify-end mt-4">
+              <div className="flex gap-3 justify-between mt-4">
                 <button
                   type="button"
-                  className="btn"
-                  onClick={() => navigate('/')}
+                  className="btn btn-error"
+                  onClick={handleDelete}
                   disabled={loading}
                 >
-                  Cancel
+                  Delete
                 </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={loading || uploadingImage || (foodType === 'composite' && compositeIngredients.length === 0)}
-                >
-                  {uploadingImage ? 'Uploading image...' : loading ? 'Updating...' : 'Update Food'}
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => navigate('/foods')}
+                    disabled={loading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={loading || uploadingImage || (foodType === 'composite' && compositeIngredients.length === 0)}
+                  >
+                    {uploadingImage ? 'Uploading image...' : loading ? 'Updating...' : 'Update Food'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
