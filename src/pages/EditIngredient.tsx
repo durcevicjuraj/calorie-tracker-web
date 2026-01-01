@@ -366,7 +366,7 @@ export default function EditIngredient() {
                   </label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     className="input input-bordered w-full"
                     value={calories}
                     onChange={(e) => setCalories(e.target.value)}
@@ -383,7 +383,7 @@ export default function EditIngredient() {
                   </label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     className="input input-bordered w-full"
                     value={protein}
                     onChange={(e) => setProtein(e.target.value)}
@@ -400,7 +400,7 @@ export default function EditIngredient() {
                   </label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     className="input input-bordered w-full"
                     value={carbs}
                     onChange={(e) => setCarbs(e.target.value)}
@@ -417,7 +417,7 @@ export default function EditIngredient() {
                   </label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     className="input input-bordered w-full"
                     value={sugar}
                     onChange={(e) => setSugar(e.target.value)}
@@ -433,7 +433,7 @@ export default function EditIngredient() {
                   </label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     className="input input-bordered w-full"
                     value={fat}
                     onChange={(e) => setFat(e.target.value)}
@@ -450,7 +450,7 @@ export default function EditIngredient() {
                   </label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     className="input input-bordered w-full"
                     value={fiber}
                     onChange={(e) => setFiber(e.target.value)}

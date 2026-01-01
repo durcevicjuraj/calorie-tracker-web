@@ -7,11 +7,15 @@ interface Food {
   id: string
   name: string
   brand_name: string | null
-  is_composite: boolean
+  description: string | null
+  category: string
+  calories: number
+  protein: number
+  carbs: number
+  sugar: number | null
+  fat: number
+  fiber: number | null
   image_url: string | null
-  categories: {
-    name: string
-  }
 }
 
 export default function Foods() {
@@ -29,7 +33,7 @@ export default function Foods() {
     try {
       const { data, error } = await supabase
         .from('foods')
-        .select('*, categories(name)')
+        .select('*')
         .order('name')
 
       if (error) throw error
@@ -205,22 +209,34 @@ export default function Foods() {
                 <div className="card-body">
                   <h3 className="card-title text-lg">
                     {food.name}
-                  </h3>
-                  <div className="flex gap-2 flex-wrap">
                     {food.brand_name && (
                       <div className="badge badge-outline badge-sm">{food.brand_name}</div>
                     )}
-                    <div className={`badge badge-sm ${food.is_composite ? 'badge-secondary' : 'badge-neutral'}`}>
-                      {food.is_composite ? 'Composite' : 'Simple'}
-                    </div>
-                    <div className="badge badge-ghost badge-sm">{food.categories?.name}</div>
-                  </div>
+                  </h3>
+                  <p className="text-sm opacity-60">{food.category}</p>
 
-                  <p className="text-sm opacity-60 mt-2">
-                    {food.is_composite
-                      ? 'Made from multiple ingredients'
-                      : 'Single ingredient food'}
-                  </p>
+                  <div className="divider my-2"></div>
+
+                  <div className="text-sm">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="opacity-60">Calories:</span>
+                        <span className="font-medium ml-2">{Number(food.calories).toFixed(2)} kcal</span>
+                      </div>
+                      <div>
+                        <span className="opacity-60">Protein:</span>
+                        <span className="font-medium ml-2">{Number(food.protein).toFixed(2)}g</span>
+                      </div>
+                      <div>
+                        <span className="opacity-60">Carbs:</span>
+                        <span className="font-medium ml-2">{Number(food.carbs).toFixed(2)}g</span>
+                      </div>
+                      <div>
+                        <span className="opacity-60">Fat:</span>
+                        <span className="font-medium ml-2">{Number(food.fat).toFixed(2)}g</span>
+                      </div>
+                    </div>
+                  </div>
 
                   <div className="card-actions justify-end mt-4">
                     <button

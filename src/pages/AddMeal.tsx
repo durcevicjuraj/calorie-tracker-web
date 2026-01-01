@@ -13,6 +13,8 @@ interface Food {
   sugar: number | null
   fat: number
   fiber: number | null
+  reference_serving_amount: number
+  reference_serving_unit: string
 }
 
 interface MealFood {
@@ -33,17 +35,25 @@ export default function AddMeal() {
   const [description, setDescription] = useState('')
   const [mealFoods, setMealFoods] = useState<MealFood[]>([])
 
-  const servingUnits = ['g', 'ml', 'cup', 'piece', 'tbsp', 'tsp', 'oz', 'lb']
-
   useEffect(() => {
     fetchFoods()
+  }, [])
+
+  // Refetch foods when window gains focus (after editing a food)
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchFoods()
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
   }, [])
 
   async function fetchFoods() {
     try {
       const { data, error } = await supabase
         .from('foods')
-        .select('id, name, brand_name, calories, protein, carbs, sugar, fat, fiber')
+        .select('id, name, brand_name, calories, protein, carbs, sugar, fat, fiber, reference_serving_amount, reference_serving_unit')
         .order('name')
 
       if (error) throw error
@@ -53,9 +63,36 @@ export default function AddMeal() {
     }
   }
 
+  function calculateMultiplier(quantity: number, unit: string, food: Food): number {
+    // If unit is 'servings', use quantity directly as multiplier
+    if (unit === 'servings') {
+      return quantity
+    }
+
+    // If unit matches food's reference unit, calculate multiplier
+    if (unit === food.reference_serving_unit) {
+      return quantity / food.reference_serving_amount
+    }
+
+    // Default: use quantity directly (no conversion)
+    return quantity
+  }
+
+  function getAvailableUnits(food: Food): string[] {
+    // Always allow 'servings'
+    const units = ['servings']
+
+    // Add the food's reference unit
+    if (food.reference_serving_unit && food.reference_serving_unit !== 'serving') {
+      units.push(food.reference_serving_unit)
+    }
+
+    return units
+  }
+
   function addMealFood() {
     if (foods.length > 0) {
-      setMealFoods([...mealFoods, { food_id: foods[0].id, quantity: '100', unit: 'g' }])
+      setMealFoods([...mealFoods, { food_id: foods[0].id, quantity: '1', unit: 'servings' }])
     }
   }
 
@@ -70,9 +107,7 @@ export default function AddMeal() {
   }
 
   function calculateNutrition() {
-    // Sum nutrition from all foods scaled by quantity
-    // NOTE: Quantity represents a multiplier (e.g., 2 = 2x the food's nutrition)
-    // This assumes each food's nutrition is for "1 serving" and quantity scales it
+    // Sum nutrition from all foods with proper unit conversion
     let totals = {
       calories: 0,
       protein: 0,
@@ -86,7 +121,7 @@ export default function AddMeal() {
       const food = foods.find(f => f.id === mf.food_id)
       if (!food) return
 
-      const multiplier = parseFloat(mf.quantity)
+      const multiplier = calculateMultiplier(parseFloat(mf.quantity), mf.unit, food)
 
       totals.calories += food.calories * multiplier
       totals.protein += food.protein * multiplier
@@ -226,53 +261,59 @@ export default function AddMeal() {
                     No foods added yet. Click "Add Food" to start building your meal.
                   </p>
                 )}
-                {mealFoods.map((mf, index) => (
-                  <div key={index} className="flex gap-2 mb-2">
-                    <select
-                      className="select select-bordered flex-1"
-                      value={mf.food_id}
-                      onChange={(e) => updateMealFood(index, 'food_id', e.target.value)}
-                      required
-                      disabled={loading}
-                    >
-                      {foods.map((food) => (
-                        <option key={food.id} value={food.id}>
-                          {food.name} {food.brand_name ? `(${food.brand_name})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="number"
-                      step="0.1"
-                      className="input input-bordered w-24"
-                      value={mf.quantity}
-                      onChange={(e) => updateMealFood(index, 'quantity', e.target.value)}
-                      required
-                      min="0"
-                      disabled={loading}
-                    />
-                    <select
-                      className="select select-bordered w-24"
-                      value={mf.unit}
-                      onChange={(e) => updateMealFood(index, 'unit', e.target.value)}
-                      disabled={loading}
-                    >
-                      {servingUnits.map((unit) => (
-                        <option key={unit} value={unit}>
-                          {unit}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      className="btn btn-square btn-outline btn-error"
-                      onClick={() => removeMealFood(index)}
-                      disabled={loading}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                {mealFoods.map((mf, index) => {
+                  const selectedFood = foods.find(f => f.id === mf.food_id)
+                  const availableUnits = selectedFood ? getAvailableUnits(selectedFood) : ['servings']
+
+                  return (
+                    <div key={index} className="flex gap-2 mb-2">
+                      <select
+                        className="select select-bordered flex-1"
+                        value={mf.food_id}
+                        onChange={(e) => updateMealFood(index, 'food_id', e.target.value)}
+                        required
+                        disabled={loading}
+                      >
+                        {foods.map((food) => (
+                          <option key={food.id} value={food.id}>
+                            {food.name} {food.brand_name ? `(${food.brand_name})` : ''} (per {food.reference_serving_amount}{food.reference_serving_unit})
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="input input-bordered w-24"
+                        placeholder="Amount"
+                        value={mf.quantity}
+                        onChange={(e) => updateMealFood(index, 'quantity', e.target.value)}
+                        required
+                        min="0"
+                        disabled={loading}
+                      />
+                      <select
+                        className="select select-bordered w-28"
+                        value={mf.unit}
+                        onChange={(e) => updateMealFood(index, 'unit', e.target.value)}
+                        disabled={loading}
+                      >
+                        {availableUnits.map((unit) => (
+                          <option key={unit} value={unit}>
+                            {unit}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className="btn btn-square btn-outline btn-error"
+                        onClick={() => removeMealFood(index)}
+                        disabled={loading}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )
+                })}
                 <button
                   type="button"
                   className="btn btn-outline btn-sm mt-2"

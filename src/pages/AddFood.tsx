@@ -40,15 +40,36 @@ export default function AddFood() {
   const [foodType, setFoodType] = useState<'simple' | 'composite'>('simple')
   const [selectedIngredientId, setSelectedIngredientId] = useState('')
   const [compositeIngredients, setCompositeIngredients] = useState<FoodIngredient[]>([])
+  const [referenceServingAmount, setReferenceServingAmount] = useState('1')
+  const [referenceServingUnit, setReferenceServingUnit] = useState('serving')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
 
-  const servingUnits = ['g', 'ml', 'cup', 'piece', 'tbsp', 'tsp', 'oz', 'lb']
+  const servingUnits = ['g', 'ml', 'cup', 'piece', 'tbsp', 'tsp', 'oz', 'lb', 'serving']
 
   useEffect(() => {
     fetchIngredients()
   }, [])
+
+  // Auto-fill reference serving when ingredient is selected (for simple foods)
+  useEffect(() => {
+    if (foodType === 'simple' && selectedIngredientId) {
+      const ingredient = ingredients.find(i => i.id === selectedIngredientId)
+      if (ingredient) {
+        setReferenceServingAmount(ingredient.serving_amount.toString())
+        setReferenceServingUnit(ingredient.serving_unit)
+      }
+    }
+  }, [selectedIngredientId, foodType, ingredients])
+
+  // Reset to default when switching to composite
+  useEffect(() => {
+    if (foodType === 'composite') {
+      setReferenceServingAmount('1')
+      setReferenceServingUnit('serving')
+    }
+  }, [foodType])
 
   async function fetchIngredients() {
     try {
@@ -208,6 +229,10 @@ export default function AddFood() {
       // Calculate nutrition from ingredients
       const nutrition = calculateNutrition()
 
+      // Use user-set reference serving values
+      const refServingAmount = parseFloat(referenceServingAmount)
+      const refServingUnit = referenceServingUnit
+
       // Insert food with calculated nutrition
       const { data: foodData, error: insertError } = await supabase
         .from('foods')
@@ -222,6 +247,8 @@ export default function AddFood() {
           sugar: nutrition.sugar,
           fat: nutrition.fat,
           fiber: nutrition.fiber,
+          reference_serving_amount: refServingAmount,
+          reference_serving_unit: refServingUnit,
           image_url: imageUrl,
           created_by: user.id,
         })
@@ -235,8 +262,8 @@ export default function AddFood() {
         ? [{
             food_id: foodData.id,
             ingredient_id: selectedIngredientId,
-            quantity: 1,
-            unit: 'serving',
+            quantity: refServingAmount,
+            unit: refServingUnit,
           }]
         : compositeIngredients.map(ci => ({
             food_id: foodData.id,
@@ -504,6 +531,82 @@ export default function AddFood() {
                       No ingredients available. Add ingredients first.
                     </p>
                   )}
+                </div>
+              )}
+
+              {/* Reference Serving - only show for simple foods or always show */}
+              {foodType === 'simple' && (
+                <div>
+                  <label className="label">
+                    <span className="label-text">Serving Size</span>
+                    <span className="label-text-alt opacity-60">Auto-filled from ingredient</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input input-bordered w-32"
+                      placeholder="Amount"
+                      value={referenceServingAmount}
+                      onChange={(e) => setReferenceServingAmount(e.target.value)}
+                      required
+                      min="0"
+                      disabled={loading}
+                    />
+                    <select
+                      className="select select-bordered flex-1"
+                      value={referenceServingUnit}
+                      onChange={(e) => setReferenceServingUnit(e.target.value)}
+                      disabled={loading}
+                    >
+                      {servingUnits.map((unit) => (
+                        <option key={unit} value={unit}>
+                          {unit}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-sm opacity-60 mt-1">
+                    Nutrition values are per this serving size (you can edit if needed)
+                  </p>
+                </div>
+              )}
+
+              {/* Reference Serving for composite foods */}
+              {foodType === 'composite' && (
+                <div>
+                  <label className="label">
+                    <span className="label-text">Reference Serving</span>
+                    <span className="label-text-alt opacity-60">Nutrition will be "per" this amount</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input input-bordered w-32"
+                      placeholder="Amount"
+                      value={referenceServingAmount}
+                      onChange={(e) => setReferenceServingAmount(e.target.value)}
+                      required
+                      min="0"
+                      disabled={loading}
+                    />
+                    <select
+                      className="select select-bordered flex-1"
+                      value={referenceServingUnit}
+                      onChange={(e) => setReferenceServingUnit(e.target.value)}
+                      disabled={loading}
+                    >
+                      {servingUnits.map((unit) => (
+                        <option key={unit} value={unit}>
+                          {unit}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-sm opacity-60 mt-1">
+                    Default is "per 1 serving" - adjust as needed
+                  </p>
                 </div>
               )}
 

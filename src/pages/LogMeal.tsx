@@ -24,16 +24,13 @@ export default function LogMeal() {
   // Form fields
   const [selectedMealId, setSelectedMealId] = useState('')
   const [quantity, setQuantity] = useState('1')
-  const [consumedAt, setConsumedAt] = useState('')
+  const [consumedDate, setConsumedDate] = useState('')
   const [notes, setNotes] = useState('')
 
   useEffect(() => {
-    // Set default consumed_at to current time
-    const now = new Date()
-    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16)
-    setConsumedAt(localDateTime)
+    // Set default consumed_date to today
+    const today = new Date().toISOString().split('T')[0]
+    setConsumedDate(today)
 
     fetchMeals()
   }, [])
@@ -94,7 +91,7 @@ export default function LogMeal() {
           fat: nutritionSnapshot.fat,
           fiber: nutritionSnapshot.fiber,
           quantity: multiplier,
-          consumed_at: new Date(consumedAt).toISOString(),
+          consumed_date: consumedDate,
           notes: notes.trim() || null,
         })
 
@@ -173,16 +170,16 @@ export default function LogMeal() {
                 />
               </div>
 
-              {/* Consumed At */}
+              {/* Consumed Date */}
               <div>
                 <label className="label">
-                  <span className="label-text">When did you eat this?</span>
+                  <span className="label-text">Date</span>
                 </label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   className="input input-bordered w-full"
-                  value={consumedAt}
-                  onChange={(e) => setConsumedAt(e.target.value)}
+                  value={consumedDate}
+                  onChange={(e) => setConsumedDate(e.target.value)}
                   required
                   disabled={loading}
                 />

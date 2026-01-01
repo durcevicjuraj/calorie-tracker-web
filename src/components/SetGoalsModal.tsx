@@ -13,7 +13,9 @@ export default function SetGoalsModal({ isOpen, onClose, onSaved }: SetGoalsModa
   const [calorieGoal, setCalorieGoal] = useState('2000')
   const [proteinGoal, setProteinGoal] = useState('150')
   const [carbsGoal, setCarbsGoal] = useState('250')
+  const [sugarGoal, setSugarGoal] = useState('')
   const [fatGoal, setFatGoal] = useState('65')
+  const [fiberGoal, setFiberGoal] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -29,14 +31,15 @@ export default function SetGoalsModal({ isOpen, onClose, onSaved }: SetGoalsModa
         .from('user_goals')
         .select('*')
         .eq('user_id', user?.id)
-        .eq('is_active', true)
         .single()
 
       if (data) {
-        setCalorieGoal(data.daily_calorie_goal.toString())
-        setProteinGoal(data.daily_protein_goal.toString())
-        setCarbsGoal(data.daily_carbs_goal.toString())
-        setFatGoal(data.daily_fat_goal.toString())
+        setCalorieGoal(data.calories.toString())
+        setProteinGoal(data.protein.toString())
+        setCarbsGoal(data.carbs.toString())
+        setSugarGoal(data.sugar?.toString() || '')
+        setFatGoal(data.fat.toString())
+        setFiberGoal(data.fiber?.toString() || '')
       }
     } catch (e) {
       // No existing goals, use defaults
@@ -51,25 +54,22 @@ export default function SetGoalsModal({ isOpen, onClose, onSaved }: SetGoalsModa
     setError(null)
 
     try {
-      // First, deactivate all existing goals
-      await supabase
+      // Upsert goals (insert or update if exists)
+      const { error: upsertError } = await supabase
         .from('user_goals')
-        .update({ is_active: false })
-        .eq('user_id', user.id)
-
-      // Then create a new active goal
-      const { error: insertError } = await supabase
-        .from('user_goals')
-        .insert({
+        .upsert({
           user_id: user.id,
-          daily_calorie_goal: parseFloat(calorieGoal),
-          daily_protein_goal: parseFloat(proteinGoal),
-          daily_carbs_goal: parseFloat(carbsGoal),
-          daily_fat_goal: parseFloat(fatGoal),
-          is_active: true,
+          calories: parseFloat(calorieGoal),
+          protein: parseFloat(proteinGoal),
+          carbs: parseFloat(carbsGoal),
+          sugar: sugarGoal ? parseFloat(sugarGoal) : null,
+          fat: parseFloat(fatGoal),
+          fiber: fiberGoal ? parseFloat(fiberGoal) : null,
+        }, {
+          onConflict: 'user_id'
         })
 
-      if (insertError) throw insertError
+      if (upsertError) throw upsertError
 
       onSaved()
       onClose()
@@ -143,6 +143,34 @@ export default function SetGoalsModal({ isOpen, onClose, onSaved }: SetGoalsModa
               value={fatGoal}
               onChange={(e) => setFatGoal(e.target.value)}
               required
+              min="0"
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="label">
+              <span className="label-text">Daily Sugar Goal (g) - Optional</span>
+            </label>
+            <input
+              type="number"
+              className="input input-bordered w-full"
+              value={sugarGoal}
+              onChange={(e) => setSugarGoal(e.target.value)}
+              min="0"
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="label">
+              <span className="label-text">Daily Fiber Goal (g) - Optional</span>
+            </label>
+            <input
+              type="number"
+              className="input input-bordered w-full"
+              value={fiberGoal}
+              onChange={(e) => setFiberGoal(e.target.value)}
               min="0"
               disabled={loading}
             />

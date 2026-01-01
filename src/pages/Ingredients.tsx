@@ -223,24 +223,24 @@ export default function Ingredients() {
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <span className="opacity-60">Calories:</span>
-                        <span className="font-medium ml-2">{ingredient.calories} kcal</span>
+                        <span className="font-medium ml-2">{Number(ingredient.calories).toFixed(2)} kcal</span>
                       </div>
                       <div>
                         <span className="opacity-60">Protein:</span>
-                        <span className="font-medium ml-2">{ingredient.protein}g</span>
+                        <span className="font-medium ml-2">{Number(ingredient.protein).toFixed(2)}g</span>
                       </div>
                       <div>
                         <span className="opacity-60">Carbs:</span>
-                        <span className="font-medium ml-2">{ingredient.carbs}g</span>
+                        <span className="font-medium ml-2">{Number(ingredient.carbs).toFixed(2)}g</span>
                       </div>
                       <div>
                         <span className="opacity-60">Fat:</span>
-                        <span className="font-medium ml-2">{ingredient.fat}g</span>
+                        <span className="font-medium ml-2">{Number(ingredient.fat).toFixed(2)}g</span>
                       </div>
                       {ingredient.fiber !== null && (
                         <div>
                           <span className="opacity-60">Fiber:</span>
-                          <span className="font-medium ml-2">{ingredient.fiber}g</span>
+                          <span className="font-medium ml-2">{Number(ingredient.fiber).toFixed(2)}g</span>
                         </div>
                       )}
                     </div>

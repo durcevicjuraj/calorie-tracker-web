@@ -7,6 +7,13 @@ interface Meal {
   id: string
   name: string
   description: string | null
+  calories: number
+  protein: number
+  carbs: number
+  sugar: number | null
+  fat: number
+  fiber: number | null
+  image_url: string | null
   created_at: string
 }
 
@@ -189,6 +196,15 @@ export default function Meals() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredMeals.map((meal) => (
               <div key={meal.id} className="card bg-base-100 shadow-sm">
+                {meal.image_url && (
+                  <figure className="h-48">
+                    <img
+                      src={meal.image_url}
+                      alt={meal.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </figure>
+                )}
                 <div className="card-body">
                   <h3 className="card-title text-lg">
                     {meal.name}
@@ -197,6 +213,29 @@ export default function Meals() {
                   {meal.description && (
                     <p className="text-sm opacity-60 mt-2">{meal.description}</p>
                   )}
+
+                  <div className="divider my-2"></div>
+
+                  <div className="text-sm">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="opacity-60">Calories:</span>
+                        <span className="font-medium ml-2">{Number(meal.calories).toFixed(2)} kcal</span>
+                      </div>
+                      <div>
+                        <span className="opacity-60">Protein:</span>
+                        <span className="font-medium ml-2">{Number(meal.protein).toFixed(2)}g</span>
+                      </div>
+                      <div>
+                        <span className="opacity-60">Carbs:</span>
+                        <span className="font-medium ml-2">{Number(meal.carbs).toFixed(2)}g</span>
+                      </div>
+                      <div>
+                        <span className="opacity-60">Fat:</span>
+                        <span className="font-medium ml-2">{Number(meal.fat).toFixed(2)}g</span>
+                      </div>
+                    </div>
+                  </div>
 
                   <div className="card-actions justify-end mt-4">
                     <button

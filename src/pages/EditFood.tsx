@@ -42,11 +42,13 @@ export default function EditFood() {
   const [foodType, setFoodType] = useState<'simple' | 'composite'>('simple')
   const [selectedIngredientId, setSelectedIngredientId] = useState('')
   const [compositeIngredients, setCompositeIngredients] = useState<FoodIngredient[]>([])
+  const [referenceServingAmount, setReferenceServingAmount] = useState('1')
+  const [referenceServingUnit, setReferenceServingUnit] = useState('serving')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
 
-  const servingUnits = ['g', 'ml', 'cup', 'piece', 'tbsp', 'tsp', 'oz', 'lb']
+  const servingUnits = ['g', 'ml', 'cup', 'piece', 'tbsp', 'tsp', 'oz', 'lb', 'serving']
 
   useEffect(() => {
     fetchIngredients()
@@ -84,6 +86,10 @@ export default function EditFood() {
         setBrandName(data.brand_name || '')
         setDescription(data.description || '')
         setCategory(data.category || '')
+
+        // Load reference serving
+        setReferenceServingAmount(data.reference_serving_amount?.toString() || '1')
+        setReferenceServingUnit(data.reference_serving_unit || 'serving')
 
         // Determine food type from food_ingredients
         if (data.food_ingredients && data.food_ingredients.length > 0) {
@@ -253,6 +259,22 @@ export default function EditFood() {
       // Calculate nutrition from ingredients
       const nutrition = calculateNutrition()
 
+      // Calculate reference serving based on food type
+      let refServingAmount: number
+      let refServingUnit: string
+
+      if (foodType === 'simple') {
+        // For simple foods, inherit serving size from the ingredient
+        const ingredient = ingredients.find(i => i.id === selectedIngredientId)
+        if (!ingredient) throw new Error('Ingredient not found')
+        refServingAmount = ingredient.serving_amount
+        refServingUnit = ingredient.serving_unit
+      } else {
+        // For composite foods, use the user-set reference serving
+        refServingAmount = parseFloat(referenceServingAmount)
+        refServingUnit = referenceServingUnit
+      }
+
       // Update food with calculated nutrition
       const { error: updateError } = await supabase
         .from('foods')
@@ -267,6 +289,8 @@ export default function EditFood() {
           sugar: nutrition.sugar,
           fat: nutrition.fat,
           fiber: nutrition.fiber,
+          reference_serving_amount: refServingAmount,
+          reference_serving_unit: refServingUnit,
           image_url: imageUrl,
         })
         .eq('id', id)
@@ -284,8 +308,8 @@ export default function EditFood() {
         ? [{
             food_id: id,
             ingredient_id: selectedIngredientId,
-            quantity: 1,
-            unit: 'serving',
+            quantity: refServingAmount,
+            unit: refServingUnit,
           }]
         : compositeIngredients.map(ci => ({
             food_id: id,
@@ -576,6 +600,82 @@ export default function EditFood() {
                       No ingredients available. Add ingredients first.
                     </p>
                   )}
+                </div>
+              )}
+
+              {/* Reference Serving for simple foods */}
+              {foodType === 'simple' && (
+                <div>
+                  <label className="label">
+                    <span className="label-text">Serving Size</span>
+                    <span className="label-text-alt opacity-60">Matches ingredient serving</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input input-bordered w-32"
+                      placeholder="Amount"
+                      value={referenceServingAmount}
+                      onChange={(e) => setReferenceServingAmount(e.target.value)}
+                      required
+                      min="0"
+                      disabled={loading}
+                    />
+                    <select
+                      className="select select-bordered flex-1"
+                      value={referenceServingUnit}
+                      onChange={(e) => setReferenceServingUnit(e.target.value)}
+                      disabled={loading}
+                    >
+                      {servingUnits.map((unit) => (
+                        <option key={unit} value={unit}>
+                          {unit}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-sm opacity-60 mt-1">
+                    Nutrition values are per this serving size
+                  </p>
+                </div>
+              )}
+
+              {/* Reference Serving for composite foods */}
+              {foodType === 'composite' && (
+                <div>
+                  <label className="label">
+                    <span className="label-text">Reference Serving</span>
+                    <span className="label-text-alt opacity-60">Nutrition will be "per" this amount</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input input-bordered w-32"
+                      placeholder="Amount"
+                      value={referenceServingAmount}
+                      onChange={(e) => setReferenceServingAmount(e.target.value)}
+                      required
+                      min="0"
+                      disabled={loading}
+                    />
+                    <select
+                      className="select select-bordered flex-1"
+                      value={referenceServingUnit}
+                      onChange={(e) => setReferenceServingUnit(e.target.value)}
+                      disabled={loading}
+                    >
+                      {servingUnits.map((unit) => (
+                        <option key={unit} value={unit}>
+                          {unit}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-sm opacity-60 mt-1">
+                    Set your preferred reference amount for this composite food
+                  </p>
                 </div>
               )}
 

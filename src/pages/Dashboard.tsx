@@ -5,10 +5,12 @@ import { supabase } from '../libs/supabase'
 import SetGoalsModal from '../components/SetGoalsModal'
 
 interface UserGoals {
-  daily_calorie_goal: number
-  daily_protein_goal: number
-  daily_carbs_goal: number
-  daily_fat_goal: number
+  calories: number
+  protein: number
+  carbs: number
+  sugar: number | null
+  fat: number
+  fiber: number | null
 }
 
 interface DailyTotals {
@@ -16,6 +18,8 @@ interface DailyTotals {
   protein: number
   carbs: number
   fat: number
+  sugar: number
+  fiber: number
   mealsLogged: number
 }
 
@@ -24,16 +28,20 @@ export default function Dashboard() {
   const { user, signOut } = useAuth()
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false)
   const [goals, setGoals] = useState<UserGoals>({
-    daily_calorie_goal: 2000,
-    daily_protein_goal: 150,
-    daily_carbs_goal: 250,
-    daily_fat_goal: 65,
+    calories: 2000,
+    protein: 150,
+    carbs: 250,
+    sugar: null,
+    fat: 65,
+    fiber: null,
   })
   const [totals, setTotals] = useState<DailyTotals>({
     calories: 0,
     protein: 0,
     carbs: 0,
     fat: 0,
+    sugar: 0,
+    fiber: 0,
     mealsLogged: 0,
   })
 
@@ -54,10 +62,12 @@ export default function Dashboard() {
 
       if (data) {
         setGoals({
-          daily_calorie_goal: data.daily_calorie_goal,
-          daily_protein_goal: data.daily_protein_goal,
-          daily_carbs_goal: data.daily_carbs_goal,
-          daily_fat_goal: data.daily_fat_goal,
+          calories: data.calories,
+          protein: data.protein,
+          carbs: data.carbs,
+          sugar: data.sugar,
+          fat: data.fat,
+          fiber: data.fiber,
         })
       }
     } catch (e) {
@@ -73,7 +83,7 @@ export default function Dashboard() {
       // Fetch today's consumption - nutrition is saved directly, no joins needed!
       const { data: consumptionData, error } = await supabase
         .from('user_consumption')
-        .select('calories, protein, carbs, fat')
+        .select('calories, protein, carbs, fat, sugar, fiber')
         .eq('user_id', user?.id)
         .eq('consumed_date', today)
 
@@ -84,12 +94,16 @@ export default function Dashboard() {
       let totalProtein = 0
       let totalCarbs = 0
       let totalFat = 0
+      let totalSugar = 0
+      let totalFiber = 0
 
       consumptionData?.forEach((entry: any) => {
         totalCalories += entry.calories || 0
         totalProtein += entry.protein || 0
         totalCarbs += entry.carbs || 0
         totalFat += entry.fat || 0
+        totalSugar += entry.sugar || 0
+        totalFiber += entry.fiber || 0
       })
 
       setTotals({
@@ -97,6 +111,8 @@ export default function Dashboard() {
         protein: Math.round(totalProtein),
         carbs: Math.round(totalCarbs),
         fat: Math.round(totalFat),
+        sugar: Math.round(totalSugar),
+        fiber: Math.round(totalFiber),
         mealsLogged: consumptionData?.length || 0,
       })
     } catch (e) {
@@ -224,13 +240,13 @@ export default function Dashboard() {
                   <p className="text-sm font-medium opacity-60">Calories</p>
                   <div className="flex items-baseline gap-2 mt-2">
                     <p className="text-3xl font-bold">{totals.calories}</p>
-                    <p className="text-sm opacity-60">/ {goals.daily_calorie_goal} kcal</p>
+                    <p className="text-sm opacity-60">/ {goals.calories} kcal</p>
                   </div>
                 </div>
                 <div className="badge badge-primary badge-sm">Today</div>
               </div>
-              <progress className="progress progress-primary" value={Math.min((totals.calories / goals.daily_calorie_goal) * 100, 100)} max="100"></progress>
-              <p className="text-xs opacity-60 mt-2">{Math.round((totals.calories / goals.daily_calorie_goal) * 100)}% of daily goal</p>
+              <progress className="progress progress-primary" value={Math.min((totals.calories / goals.calories) * 100, 100)} max="100"></progress>
+              <p className="text-xs opacity-60 mt-2">{Math.round((totals.calories / goals.calories) * 100)}% of daily goal</p>
             </div>
           </div>
 
@@ -241,11 +257,11 @@ export default function Dashboard() {
                 <p className="text-sm font-medium opacity-60">Protein</p>
                 <div className="flex items-baseline gap-2 mt-2">
                   <p className="text-3xl font-bold">{totals.protein}</p>
-                  <p className="text-sm opacity-60">/ {goals.daily_protein_goal}g</p>
+                  <p className="text-sm opacity-60">/ {goals.protein}g</p>
                 </div>
               </div>
-              <progress className="progress progress-success" value={Math.min((totals.protein / goals.daily_protein_goal) * 100, 100)} max="100"></progress>
-              <p className="text-xs opacity-60 mt-2">{Math.round((totals.protein / goals.daily_protein_goal) * 100)}% of daily goal</p>
+              <progress className="progress progress-success" value={Math.min((totals.protein / goals.protein) * 100, 100)} max="100"></progress>
+              <p className="text-xs opacity-60 mt-2">{Math.round((totals.protein / goals.protein) * 100)}% of daily goal</p>
             </div>
           </div>
 
@@ -272,28 +288,39 @@ export default function Dashboard() {
         <div className="card bg-base-100 shadow-sm mb-8">
           <div className="card-body">
             <h3 className="text-lg font-semibold mb-6">Macronutrients</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium">Protein</span>
-                  <span className="text-sm opacity-60">{totals.protein} / {goals.daily_protein_goal}g</span>
-                </div>
-                <progress className="progress progress-success w-full" value={Math.min((totals.protein / goals.daily_protein_goal) * 100, 100)} max="100"></progress>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-medium">Carbs</span>
-                  <span className="text-sm opacity-60">{totals.carbs} / {goals.daily_carbs_goal}g</span>
+                  <span className="text-sm opacity-60">{totals.carbs} / {goals.carbs}g</span>
                 </div>
-                <progress className="progress progress-warning w-full" value={Math.min((totals.carbs / goals.daily_carbs_goal) * 100, 100)} max="100"></progress>
+                <progress className="progress progress-warning w-full" value={Math.min((totals.carbs / goals.carbs) * 100, 100)} max="100"></progress>
               </div>
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-medium">Fats</span>
-                  <span className="text-sm opacity-60">{totals.fat} / {goals.daily_fat_goal}g</span>
+                  <span className="text-sm opacity-60">{totals.fat} / {goals.fat}g</span>
                 </div>
-                <progress className="progress progress-info w-full" value={Math.min((totals.fat / goals.daily_fat_goal) * 100, 100)} max="100"></progress>
+                <progress className="progress progress-info w-full" value={Math.min((totals.fat / goals.fat) * 100, 100)} max="100"></progress>
               </div>
+              {goals.sugar !== null && (
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">Sugar</span>
+                    <span className="text-sm opacity-60">{totals.sugar} / {goals.sugar}g</span>
+                  </div>
+                  <progress className="progress progress-error w-full" value={Math.min((totals.sugar / goals.sugar) * 100, 100)} max="100"></progress>
+                </div>
+              )}
+              {goals.fiber !== null && (
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">Fiber</span>
+                    <span className="text-sm opacity-60">{totals.fiber} / {goals.fiber}g</span>
+                  </div>
+                  <progress className="progress progress-accent w-full" value={Math.min((totals.fiber / goals.fiber) * 100, 100)} max="100"></progress>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -327,8 +354,11 @@ export default function Dashboard() {
               >
                 + Add Ingredient
               </button>
-              <button className="btn btn-outline">
-                View Stats
+              <button
+                className="btn btn-outline"
+                onClick={() => navigate('/logs')}
+              >
+                View Logs
               </button>
               <button
                 className="btn btn-outline"
