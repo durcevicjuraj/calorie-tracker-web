@@ -3,17 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom'
 import imageCompression from 'browser-image-compression'
 import { supabase } from '../libs/supabase'
 import { useAuth } from '../hooks/useAuth'
-
-interface Category {
-  id: string
-  name: string
-}
+import { INGREDIENT_CATEGORIES } from '../constants/categories'
 
 export default function EditIngredient() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
-  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null)
@@ -21,12 +16,14 @@ export default function EditIngredient() {
   // Form fields
   const [name, setName] = useState('')
   const [brandName, setBrandName] = useState('')
-  const [categoryId, setCategoryId] = useState('')
+  const [description, setDescription] = useState('')
+  const [category, setCategory] = useState('')
   const [servingAmount, setServingAmount] = useState('100')
   const [servingUnit, setServingUnit] = useState('g')
   const [calories, setCalories] = useState('')
   const [protein, setProtein] = useState('')
   const [carbs, setCarbs] = useState('')
+  const [sugar, setSugar] = useState('')
   const [fat, setFat] = useState('')
   const [fiber, setFiber] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -36,25 +33,10 @@ export default function EditIngredient() {
   const servingUnits = ['g', 'ml', 'cup', 'piece', 'tbsp', 'tsp', 'oz', 'lb']
 
   useEffect(() => {
-    fetchCategories()
     if (id) {
       fetchIngredient()
     }
   }, [id])
-
-  async function fetchCategories() {
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name')
-
-      if (error) throw error
-      setCategories(data || [])
-    } catch (e: any) {
-      console.error('Error fetching categories:', e)
-    }
-  }
 
   async function fetchIngredient() {
     try {
@@ -69,19 +51,16 @@ export default function EditIngredient() {
       if (data) {
         setName(data.name)
         setBrandName(data.brand_name || '')
-        setCategoryId(data.category_id)
+        setDescription(data.description || '')
+        setCategory(data.category || '')
+        setServingAmount(data.serving_amount?.toString() || '100')
+        setServingUnit(data.serving_unit || 'g')
         setCalories(data.calories?.toString() || '')
         setProtein(data.protein?.toString() || '')
         setCarbs(data.carbs?.toString() || '')
+        setSugar(data.sugar?.toString() || '')
         setFat(data.fat?.toString() || '')
         setFiber(data.fiber?.toString() || '')
-
-        // Parse serving size
-        const match = data.serving_size?.match(/^([\d.]+)(.+)$/)
-        if (match) {
-          setServingAmount(match[1])
-          setServingUnit(match[2])
-        }
 
         if (data.image_url) {
           setExistingImageUrl(data.image_url)
@@ -174,11 +153,14 @@ export default function EditIngredient() {
         .update({
           name: name.trim(),
           brand_name: brandName.trim() || null,
-          category_id: categoryId,
-          serving_size: `${servingAmount}${servingUnit}`,
+          description: description.trim() || null,
+          category: category,
+          serving_amount: parseFloat(servingAmount),
+          serving_unit: servingUnit,
           calories: parseFloat(calories),
           protein: parseFloat(protein),
           carbs: parseFloat(carbs),
+          sugar: sugar ? parseFloat(sugar) : null,
           fat: parseFloat(fat),
           fiber: fiber ? parseFloat(fiber) : null,
           image_url: imageUrl,
@@ -271,6 +253,21 @@ export default function EditIngredient() {
                 />
               </div>
 
+              {/* Description */}
+              <div>
+                <label className="label">
+                  <span className="label-text">Description (Optional)</span>
+                </label>
+                <textarea
+                  className="textarea textarea-bordered w-full"
+                  placeholder="Add any notes about this ingredient..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  disabled={loading}
+                />
+              </div>
+
               {/* Image Upload */}
               <div>
                 <label className="label">
@@ -309,19 +306,21 @@ export default function EditIngredient() {
                 <label className="label">
                   <span className="label-text">Category</span>
                 </label>
-                <select
-                  className="select select-bordered w-full"
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
+                <input
+                  type="text"
+                  list="ingredient-categories"
+                  className="input input-bordered w-full"
+                  placeholder="e.g., Protein, Vegetables, Fruits"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
                   required
-                  disabled={loading || categories.length === 0}
-                >
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
+                  disabled={loading}
+                />
+                <datalist id="ingredient-categories">
+                  {INGREDIENT_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat} />
                   ))}
-                </select>
+                </datalist>
               </div>
 
               {/* Serving Size */}
@@ -406,6 +405,22 @@ export default function EditIngredient() {
                     value={carbs}
                     onChange={(e) => setCarbs(e.target.value)}
                     required
+                    min="0"
+                    disabled={loading}
+                  />
+                </div>
+
+                {/* Sugar */}
+                <div>
+                  <label className="label">
+                    <span className="label-text">Sugar (g) - Optional</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="input input-bordered w-full"
+                    value={sugar}
+                    onChange={(e) => setSugar(e.target.value)}
                     min="0"
                     disabled={loading}
                   />

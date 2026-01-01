@@ -6,7 +6,6 @@ import { useAuth } from '../hooks/useAuth'
 interface Meal {
   id: string
   name: string
-  meal_type: string
   description: string | null
   created_at: string
 }
@@ -42,16 +41,6 @@ export default function Meals() {
     meal.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     meal.description?.toLowerCase().includes(searchQuery.toLowerCase())
   )
-
-  const getMealTypeColor = (type: string) => {
-    switch (type) {
-      case 'breakfast': return 'badge-warning'
-      case 'lunch': return 'badge-success'
-      case 'dinner': return 'badge-info'
-      case 'snack': return 'badge-secondary'
-      default: return 'badge-neutral'
-    }
-  }
 
   return (
     <div className="min-h-dvh bg-base-200">
@@ -204,9 +193,6 @@ export default function Meals() {
                   <h3 className="card-title text-lg">
                     {meal.name}
                   </h3>
-                  <div className={`badge ${getMealTypeColor(meal.meal_type)} badge-sm`}>
-                    {meal.meal_type.charAt(0).toUpperCase() + meal.meal_type.slice(1)}
-                  </div>
 
                   {meal.description && (
                     <p className="text-sm opacity-60 mt-2">{meal.description}</p>

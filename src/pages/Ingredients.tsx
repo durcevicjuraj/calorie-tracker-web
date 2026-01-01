@@ -7,17 +7,16 @@ interface Ingredient {
   id: string
   name: string
   brand_name: string | null
-  category_id: string
+  category: string
+  serving_amount: number
+  serving_unit: string
   calories: number
   protein: number
   carbs: number
+  sugar: number | null
   fat: number
   fiber: number | null
-  serving_size: string
   image_url: string | null
-  categories: {
-    name: string
-  }
 }
 
 export default function Ingredients() {
@@ -35,7 +34,7 @@ export default function Ingredients() {
     try {
       const { data, error } = await supabase
         .from('ingredients')
-        .select('*, categories(name)')
+        .select('*')
         .order('name')
 
       if (error) throw error
@@ -215,12 +214,12 @@ export default function Ingredients() {
                       <div className="badge badge-outline badge-sm">{ingredient.brand_name}</div>
                     )}
                   </h3>
-                  <p className="text-sm opacity-60">{ingredient.categories?.name}</p>
+                  <p className="text-sm opacity-60">{ingredient.category}</p>
 
                   <div className="divider my-2"></div>
 
                   <div className="text-sm">
-                    <p className="font-medium mb-2">Per {ingredient.serving_size}:</p>
+                    <p className="font-medium mb-2">Per {ingredient.serving_amount}{ingredient.serving_unit}:</p>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <span className="opacity-60">Calories:</span>

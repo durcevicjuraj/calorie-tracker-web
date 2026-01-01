@@ -6,33 +6,26 @@ import { useAuth } from '../hooks/useAuth'
 interface Meal {
   id: string
   name: string
-  meal_type: string
-}
-
-interface Food {
-  id: string
-  name: string
-  brand_name: string | null
+  calories: number
+  protein: number
+  carbs: number
+  sugar: number | null
+  fat: number
+  fiber: number | null
 }
 
 export default function LogMeal() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [meals, setMeals] = useState<Meal[]>([])
-  const [foods, setFoods] = useState<Food[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Form fields
-  const [logType, setLogType] = useState<'meal' | 'food'>('meal')
   const [selectedMealId, setSelectedMealId] = useState('')
-  const [selectedFoodId, setSelectedFoodId] = useState('')
   const [quantity, setQuantity] = useState('1')
-  const [unit, setUnit] = useState('serving')
   const [consumedAt, setConsumedAt] = useState('')
   const [notes, setNotes] = useState('')
-
-  const servingUnits = ['serving', 'g', 'ml', 'cup', 'piece', 'tbsp', 'tsp', 'oz', 'lb']
 
   useEffect(() => {
     // Set default consumed_at to current time
@@ -43,14 +36,13 @@ export default function LogMeal() {
     setConsumedAt(localDateTime)
 
     fetchMeals()
-    fetchFoods()
   }, [])
 
   async function fetchMeals() {
     try {
       const { data, error } = await supabase
         .from('meals')
-        .select('id, name, meal_type')
+        .select('id, name, calories, protein, carbs, sugar, fat, fiber')
         .order('name')
 
       if (error) throw error
@@ -63,23 +55,6 @@ export default function LogMeal() {
     }
   }
 
-  async function fetchFoods() {
-    try {
-      const { data, error } = await supabase
-        .from('foods')
-        .select('id, name, brand_name')
-        .order('name')
-
-      if (error) throw error
-      setFoods(data || [])
-      if (data && data.length > 0) {
-        setSelectedFoodId(data[0].id)
-      }
-    } catch (e: any) {
-      console.error('Error fetching foods:', e)
-    }
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!user || loading) return
@@ -88,14 +63,37 @@ export default function LogMeal() {
     setError(null)
 
     try {
+      // Find the selected meal to get nutrition data
+      const meal = meals.find(m => m.id === selectedMealId)
+      if (!meal) {
+        throw new Error('Selected meal not found')
+      }
+
+      // Calculate nutrition snapshot based on quantity
+      const multiplier = parseFloat(quantity)
+      const nutritionSnapshot = {
+        calories: meal.calories * multiplier,
+        protein: meal.protein * multiplier,
+        carbs: meal.carbs * multiplier,
+        sugar: meal.sugar ? meal.sugar * multiplier : null,
+        fat: meal.fat * multiplier,
+        fiber: meal.fiber ? meal.fiber * multiplier : null,
+      }
+
+      // Insert consumption with nutrition snapshot
       const { error: insertError } = await supabase
         .from('user_consumption')
         .insert({
           user_id: user.id,
-          meal_id: logType === 'meal' ? selectedMealId : null,
-          food_id: logType === 'food' ? selectedFoodId : null,
-          quantity: parseFloat(quantity),
-          unit: unit,
+          meal_id: selectedMealId,
+          meal_name: meal.name,
+          calories: nutritionSnapshot.calories,
+          protein: nutritionSnapshot.protein,
+          carbs: nutritionSnapshot.carbs,
+          sugar: nutritionSnapshot.sugar,
+          fat: nutritionSnapshot.fat,
+          fiber: nutritionSnapshot.fiber,
+          quantity: multiplier,
           consumed_at: new Date(consumedAt).toISOString(),
           notes: notes.trim() || null,
         })
@@ -132,118 +130,47 @@ export default function LogMeal() {
         <div className="card bg-base-100 shadow-sm">
           <div className="card-body">
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              {/* Log Type */}
+              {/* Select Meal */}
               <div>
                 <label className="label">
-                  <span className="label-text">What are you logging?</span>
+                  <span className="label-text">Select Meal</span>
                 </label>
-                <div className="flex gap-4">
-                  <label className="label cursor-pointer gap-2">
-                    <input
-                      type="radio"
-                      className="radio"
-                      checked={logType === 'meal'}
-                      onChange={() => setLogType('meal')}
-                      disabled={loading}
-                    />
-                    <span className="label-text">Meal</span>
-                  </label>
-                  <label className="label cursor-pointer gap-2">
-                    <input
-                      type="radio"
-                      className="radio"
-                      checked={logType === 'food'}
-                      onChange={() => setLogType('food')}
-                      disabled={loading}
-                    />
-                    <span className="label-text">Individual Food</span>
-                  </label>
-                </div>
+                <select
+                  className="select select-bordered w-full"
+                  value={selectedMealId}
+                  onChange={(e) => setSelectedMealId(e.target.value)}
+                  required
+                  disabled={loading || meals.length === 0}
+                >
+                  {meals.map((meal) => (
+                    <option key={meal.id} value={meal.id}>
+                      {meal.name}
+                    </option>
+                  ))}
+                </select>
+                {meals.length === 0 && (
+                  <p className="text-sm text-warning mt-2">
+                    No meals available. Create meals first.
+                  </p>
+                )}
               </div>
-
-              {/* Select Meal */}
-              {logType === 'meal' && (
-                <div>
-                  <label className="label">
-                    <span className="label-text">Select Meal</span>
-                  </label>
-                  <select
-                    className="select select-bordered w-full"
-                    value={selectedMealId}
-                    onChange={(e) => setSelectedMealId(e.target.value)}
-                    required
-                    disabled={loading || meals.length === 0}
-                  >
-                    {meals.map((meal) => (
-                      <option key={meal.id} value={meal.id}>
-                        {meal.name} ({meal.meal_type})
-                      </option>
-                    ))}
-                  </select>
-                  {meals.length === 0 && (
-                    <p className="text-sm text-warning mt-2">
-                      No meals available. Create meals first.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Select Food */}
-              {logType === 'food' && (
-                <div>
-                  <label className="label">
-                    <span className="label-text">Select Food</span>
-                  </label>
-                  <select
-                    className="select select-bordered w-full"
-                    value={selectedFoodId}
-                    onChange={(e) => setSelectedFoodId(e.target.value)}
-                    required
-                    disabled={loading || foods.length === 0}
-                  >
-                    {foods.map((food) => (
-                      <option key={food.id} value={food.id}>
-                        {food.name} {food.brand_name ? `(${food.brand_name})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {foods.length === 0 && (
-                    <p className="text-sm text-warning mt-2">
-                      No foods available. Create foods first.
-                    </p>
-                  )}
-                </div>
-              )}
 
               {/* Quantity */}
               <div>
                 <label className="label">
-                  <span className="label-text">Quantity</span>
+                  <span className="label-text">Quantity (servings)</span>
+                  <span className="label-text-alt opacity-60">How many servings did you eat?</span>
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="input input-bordered flex-1"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    required
-                    min="0"
-                    disabled={loading}
-                  />
-                  <select
-                    className="select select-bordered w-32"
-                    value={unit}
-                    onChange={(e) => setUnit(e.target.value)}
-                    disabled={loading}
-                  >
-                    {servingUnits.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <input
+                  type="number"
+                  step="0.1"
+                  className="input input-bordered w-full"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  required
+                  min="0"
+                  disabled={loading}
+                />
               </div>
 
               {/* Consumed At */}
@@ -292,9 +219,9 @@ export default function LogMeal() {
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={loading || (logType === 'meal' && meals.length === 0) || (logType === 'food' && foods.length === 0)}
+                  disabled={loading || meals.length === 0}
                 >
-                  {loading ? 'Logging...' : 'Log'}
+                  {loading ? 'Logging...' : 'Log Meal'}
                 </button>
               </div>
             </form>

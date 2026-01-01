@@ -7,6 +7,12 @@ interface Food {
   id: string
   name: string
   brand_name: string | null
+  calories: number
+  protein: number
+  carbs: number
+  sugar: number | null
+  fat: number
+  fiber: number | null
 }
 
 interface MealFood {
@@ -25,11 +31,9 @@ export default function EditMeal() {
 
   // Form fields
   const [name, setName] = useState('')
-  const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack' | 'other'>('breakfast')
   const [description, setDescription] = useState('')
   const [mealFoods, setMealFoods] = useState<MealFood[]>([])
 
-  const mealTypes = ['breakfast', 'lunch', 'dinner', 'snack', 'other']
   const servingUnits = ['g', 'ml', 'cup', 'piece', 'tbsp', 'tsp', 'oz', 'lb']
 
   useEffect(() => {
@@ -43,7 +47,7 @@ export default function EditMeal() {
     try {
       const { data, error } = await supabase
         .from('foods')
-        .select('id, name, brand_name')
+        .select('id, name, brand_name, calories, protein, carbs, sugar, fat, fiber')
         .order('name')
 
       if (error) throw error
@@ -65,7 +69,6 @@ export default function EditMeal() {
 
       if (data) {
         setName(data.name)
-        setMealType(data.meal_type)
         setDescription(data.description || '')
 
         if (data.meal_foods) {
@@ -98,6 +101,43 @@ export default function EditMeal() {
     setMealFoods(updated)
   }
 
+  function calculateNutrition() {
+    // Sum nutrition from all foods scaled by quantity
+    // NOTE: Quantity represents a multiplier (e.g., 2 = 2x the food's nutrition)
+    // This assumes each food's nutrition is for "1 serving" and quantity scales it
+    let totals = {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      sugar: 0,
+      fat: 0,
+      fiber: 0
+    }
+
+    mealFoods.forEach(mf => {
+      const food = foods.find(f => f.id === mf.food_id)
+      if (!food) return
+
+      const multiplier = parseFloat(mf.quantity)
+
+      totals.calories += food.calories * multiplier
+      totals.protein += food.protein * multiplier
+      totals.carbs += food.carbs * multiplier
+      totals.sugar += (food.sugar || 0) * multiplier
+      totals.fat += food.fat * multiplier
+      totals.fiber += (food.fiber || 0) * multiplier
+    })
+
+    return {
+      calories: totals.calories,
+      protein: totals.protein,
+      carbs: totals.carbs,
+      sugar: totals.sugar > 0 ? totals.sugar : null,
+      fat: totals.fat,
+      fiber: totals.fiber > 0 ? totals.fiber : null
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!user || loading) return
@@ -111,13 +151,21 @@ export default function EditMeal() {
     setError(null)
 
     try {
-      // Update meal
+      // Calculate nutrition from foods
+      const nutrition = calculateNutrition()
+
+      // Update meal with calculated nutrition
       const { error: updateError } = await supabase
         .from('meals')
         .update({
           name: name.trim(),
-          meal_type: mealType,
           description: description.trim() || null,
+          calories: nutrition.calories,
+          protein: nutrition.protein,
+          carbs: nutrition.carbs,
+          sugar: nutrition.sugar,
+          fat: nutrition.fat,
+          fiber: nutrition.fiber,
         })
         .eq('id', id)
 
@@ -210,25 +258,6 @@ export default function EditMeal() {
                   required
                   disabled={loading}
                 />
-              </div>
-
-              {/* Meal Type */}
-              <div>
-                <label className="label">
-                  <span className="label-text">Meal Type</span>
-                </label>
-                <select
-                  className="select select-bordered w-full"
-                  value={mealType}
-                  onChange={(e) => setMealType(e.target.value as typeof mealType)}
-                  disabled={loading}
-                >
-                  {mealTypes.map((type) => (
-                    <option key={type} value={type}>
-                      {type.charAt(0).toUpperCase() + type.slice(1)}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               {/* Description */}

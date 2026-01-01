@@ -3,28 +3,25 @@ import { useNavigate } from 'react-router-dom'
 import imageCompression from 'browser-image-compression'
 import { supabase } from '../libs/supabase'
 import { useAuth } from '../hooks/useAuth'
-
-interface Category {
-  id: string
-  name: string
-}
+import { INGREDIENT_CATEGORIES } from '../constants/categories'
 
 export default function AddIngredient() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Form fields
   const [name, setName] = useState('')
   const [brandName, setBrandName] = useState('')
-  const [categoryId, setCategoryId] = useState('')
+  const [description, setDescription] = useState('')
+  const [category, setCategory] = useState('')
   const [servingAmount, setServingAmount] = useState('100')
   const [servingUnit, setServingUnit] = useState('g')
   const [calories, setCalories] = useState('')
   const [protein, setProtein] = useState('')
   const [carbs, setCarbs] = useState('')
+  const [sugar, setSugar] = useState('')
   const [fat, setFat] = useState('')
   const [fiber, setFiber] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -32,27 +29,6 @@ export default function AddIngredient() {
   const [uploadingImage, setUploadingImage] = useState(false)
 
   const servingUnits = ['g', 'ml', 'cup', 'piece', 'tbsp', 'tsp', 'oz', 'lb']
-
-  useEffect(() => {
-    fetchCategories()
-  }, [])
-
-  async function fetchCategories() {
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name')
-
-      if (error) throw error
-      setCategories(data || [])
-      if (data && data.length > 0) {
-        setCategoryId(data[0].id)
-      }
-    } catch (e: any) {
-      console.error('Error fetching categories:', e)
-    }
-  }
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -129,16 +105,19 @@ export default function AddIngredient() {
         imageUrl = await uploadImage()
       }
 
-      const { error: insertError } = await supabase
+      const { error: insertError} = await supabase
         .from('ingredients')
         .insert({
           name: name.trim(),
           brand_name: brandName.trim() || null,
-          category_id: categoryId,
-          serving_size: `${servingAmount}${servingUnit}`,
+          description: description.trim() || null,
+          category: category,
+          serving_amount: parseFloat(servingAmount),
+          serving_unit: servingUnit,
           calories: parseFloat(calories),
           protein: parseFloat(protein),
           carbs: parseFloat(carbs),
+          sugar: sugar ? parseFloat(sugar) : null,
           fat: parseFloat(fat),
           fiber: fiber ? parseFloat(fiber) : null,
           image_url: imageUrl,
@@ -208,6 +187,21 @@ export default function AddIngredient() {
                 />
               </div>
 
+              {/* Description */}
+              <div>
+                <label className="label">
+                  <span className="label-text">Description (Optional)</span>
+                </label>
+                <textarea
+                  className="textarea textarea-bordered w-full"
+                  placeholder="Add any notes about this ingredient..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  disabled={loading}
+                />
+              </div>
+
               {/* Image Upload */}
               <div>
                 <label className="label">
@@ -246,19 +240,21 @@ export default function AddIngredient() {
                 <label className="label">
                   <span className="label-text">Category</span>
                 </label>
-                <select
-                  className="select select-bordered w-full"
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
+                <input
+                  type="text"
+                  list="ingredient-categories"
+                  className="input input-bordered w-full"
+                  placeholder="e.g., Protein, Vegetables, Fruits"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
                   required
-                  disabled={loading || categories.length === 0}
-                >
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
+                  disabled={loading}
+                />
+                <datalist id="ingredient-categories">
+                  {INGREDIENT_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat} />
                   ))}
-                </select>
+                </datalist>
               </div>
 
               {/* Serving Size */}
@@ -343,6 +339,22 @@ export default function AddIngredient() {
                     value={carbs}
                     onChange={(e) => setCarbs(e.target.value)}
                     required
+                    min="0"
+                    disabled={loading}
+                  />
+                </div>
+
+                {/* Sugar */}
+                <div>
+                  <label className="label">
+                    <span className="label-text">Sugar (g) - Optional</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="input input-bordered w-full"
+                    value={sugar}
+                    onChange={(e) => setSugar(e.target.value)}
                     min="0"
                     disabled={loading}
                   />

@@ -50,7 +50,6 @@ export default function Dashboard() {
         .from('user_goals')
         .select('*')
         .eq('user_id', user?.id)
-        .eq('is_active', true)
         .single()
 
       if (data) {
@@ -68,109 +67,29 @@ export default function Dashboard() {
 
   async function fetchTodaysTotals() {
     try {
-      // Get today's date range
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const tomorrow = new Date(today)
-      tomorrow.setDate(tomorrow.getDate() + 1)
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0]
 
-      // Fetch today's consumption
+      // Fetch today's consumption - nutrition is saved directly, no joins needed!
       const { data: consumptionData, error } = await supabase
         .from('user_consumption')
-        .select(`
-          *,
-          meals (
-            id,
-            name,
-            meal_foods (
-              quantity,
-              unit,
-              foods (
-                id,
-                name,
-                ingredient_id,
-                is_composite,
-                ingredients (
-                  calories,
-                  protein,
-                  carbs,
-                  fat,
-                  serving_size
-                ),
-                food_ingredients (
-                  quantity,
-                  unit,
-                  ingredients (
-                    calories,
-                    protein,
-                    carbs,
-                    fat,
-                    serving_size
-                  )
-                )
-              )
-            )
-          ),
-          foods (
-            id,
-            name,
-            ingredient_id,
-            is_composite,
-            ingredients (
-              calories,
-              protein,
-              carbs,
-              fat,
-              serving_size
-            ),
-            food_ingredients (
-              quantity,
-              unit,
-              ingredients (
-                calories,
-                protein,
-                carbs,
-                fat,
-                serving_size
-              )
-            )
-          )
-        `)
+        .select('calories, protein, carbs, fat')
         .eq('user_id', user?.id)
-        .gte('consumed_at', today.toISOString())
-        .lt('consumed_at', tomorrow.toISOString())
+        .eq('consumed_date', today)
 
       if (error) throw error
 
+      // Simply sum the saved nutrition values
       let totalCalories = 0
       let totalProtein = 0
       let totalCarbs = 0
       let totalFat = 0
 
-      // Calculate totals from consumption data
       consumptionData?.forEach((entry: any) => {
-        const consumedQuantity = entry.quantity
-
-        if (entry.meal_id && entry.meals) {
-          // Calculate for meals
-          entry.meals.meal_foods?.forEach((mf: any) => {
-            if (mf.foods) {
-              const foodNutrition = calculateFoodNutrition(mf.foods)
-              const multiplier = (mf.quantity / 100) * consumedQuantity
-              totalCalories += foodNutrition.calories * multiplier
-              totalProtein += foodNutrition.protein * multiplier
-              totalCarbs += foodNutrition.carbs * multiplier
-              totalFat += foodNutrition.fat * multiplier
-            }
-          })
-        } else if (entry.food_id && entry.foods) {
-          // Calculate for individual foods
-          const foodNutrition = calculateFoodNutrition(entry.foods)
-          totalCalories += foodNutrition.calories * consumedQuantity
-          totalProtein += foodNutrition.protein * consumedQuantity
-          totalCarbs += foodNutrition.carbs * consumedQuantity
-          totalFat += foodNutrition.fat * consumedQuantity
-        }
+        totalCalories += entry.calories || 0
+        totalProtein += entry.protein || 0
+        totalCarbs += entry.carbs || 0
+        totalFat += entry.fat || 0
       })
 
       setTotals({
@@ -183,32 +102,6 @@ export default function Dashboard() {
     } catch (e) {
       console.error('Error fetching totals:', e)
     }
-  }
-
-  function calculateFoodNutrition(food: any) {
-    if (food.is_composite) {
-      // Composite food: sum all ingredients
-      let calories = 0, protein = 0, carbs = 0, fat = 0
-      food.food_ingredients?.forEach((fi: any) => {
-        if (fi.ingredients) {
-          const multiplier = fi.quantity / 100
-          calories += fi.ingredients.calories * multiplier
-          protein += fi.ingredients.protein * multiplier
-          carbs += fi.ingredients.carbs * multiplier
-          fat += fi.ingredients.fat * multiplier
-        }
-      })
-      return { calories, protein, carbs, fat }
-    } else if (food.ingredients) {
-      // Simple food: get from ingredient
-      return {
-        calories: food.ingredients.calories,
-        protein: food.ingredients.protein,
-        carbs: food.ingredients.carbs,
-        fat: food.ingredients.fat,
-      }
-    }
-    return { calories: 0, protein: 0, carbs: 0, fat: 0 }
   }
 
   return (

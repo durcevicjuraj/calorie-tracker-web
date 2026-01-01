@@ -3,20 +3,20 @@ import { useNavigate, useParams } from 'react-router-dom'
 import imageCompression from 'browser-image-compression'
 import { supabase } from '../libs/supabase'
 import { useAuth } from '../hooks/useAuth'
-
-interface Category {
-  id: string
-  name: string
-}
+import { FOOD_CATEGORIES } from '../constants/categories'
 
 interface Ingredient {
   id: string
   name: string
   brand_name: string | null
+  serving_amount: number
+  serving_unit: string
   calories: number
   protein: number
   carbs: number
+  sugar: number | null
   fat: number
+  fiber: number | null
 }
 
 interface FoodIngredient {
@@ -29,7 +29,6 @@ export default function EditFood() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
-  const [categories, setCategories] = useState<Category[]>([])
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -38,7 +37,8 @@ export default function EditFood() {
   // Form fields
   const [name, setName] = useState('')
   const [brandName, setBrandName] = useState('')
-  const [categoryId, setCategoryId] = useState('')
+  const [description, setDescription] = useState('')
+  const [category, setCategory] = useState('')
   const [foodType, setFoodType] = useState<'simple' | 'composite'>('simple')
   const [selectedIngredientId, setSelectedIngredientId] = useState('')
   const [compositeIngredients, setCompositeIngredients] = useState<FoodIngredient[]>([])
@@ -49,32 +49,17 @@ export default function EditFood() {
   const servingUnits = ['g', 'ml', 'cup', 'piece', 'tbsp', 'tsp', 'oz', 'lb']
 
   useEffect(() => {
-    fetchCategories()
     fetchIngredients()
     if (id) {
       fetchFood()
     }
   }, [id])
 
-  async function fetchCategories() {
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name')
-
-      if (error) throw error
-      setCategories(data || [])
-    } catch (e: any) {
-      console.error('Error fetching categories:', e)
-    }
-  }
-
   async function fetchIngredients() {
     try {
       const { data, error } = await supabase
         .from('ingredients')
-        .select('id, name, brand_name, calories, protein, carbs, fat')
+        .select('id, name, brand_name, serving_amount, serving_unit, calories, protein, carbs, sugar, fat, fiber')
         .order('name')
 
       if (error) throw error
@@ -97,17 +82,22 @@ export default function EditFood() {
       if (data) {
         setName(data.name)
         setBrandName(data.brand_name || '')
-        setCategoryId(data.category_id)
-        setFoodType(data.is_composite ? 'composite' : 'simple')
+        setDescription(data.description || '')
+        setCategory(data.category || '')
 
-        if (data.is_composite && data.food_ingredients) {
-          setCompositeIngredients(data.food_ingredients.map((fi: any) => ({
-            ingredient_id: fi.ingredient_id,
-            quantity: fi.quantity.toString(),
-            unit: fi.unit,
-          })))
-        } else if (data.ingredient_id) {
-          setSelectedIngredientId(data.ingredient_id)
+        // Determine food type from food_ingredients
+        if (data.food_ingredients && data.food_ingredients.length > 0) {
+          if (data.food_ingredients.length === 1) {
+            setFoodType('simple')
+            setSelectedIngredientId(data.food_ingredients[0].ingredient_id)
+          } else {
+            setFoodType('composite')
+            setCompositeIngredients(data.food_ingredients.map((fi: any) => ({
+              ingredient_id: fi.ingredient_id,
+              quantity: fi.quantity.toString(),
+              unit: fi.unit,
+            })))
+          }
         }
 
         if (data.image_url) {
@@ -192,6 +182,60 @@ export default function EditFood() {
     setCompositeIngredients(updated)
   }
 
+  function calculateNutrition() {
+    if (foodType === 'simple') {
+      // For simple food, get nutrition from the selected ingredient
+      const ingredient = ingredients.find(i => i.id === selectedIngredientId)
+      if (!ingredient) {
+        return { calories: 0, protein: 0, carbs: 0, sugar: null, fat: 0, fiber: null }
+      }
+      return {
+        calories: ingredient.calories,
+        protein: ingredient.protein,
+        carbs: ingredient.carbs,
+        sugar: ingredient.sugar,
+        fat: ingredient.fat,
+        fiber: ingredient.fiber
+      }
+    } else {
+      // For composite food, sum nutrition from all ingredients scaled by quantity
+      // NOTE: This assumes units match between ingredient serving and added quantity
+      // Unit conversion is not implemented yet
+      let totals = {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        sugar: 0,
+        fat: 0,
+        fiber: 0
+      }
+
+      compositeIngredients.forEach(ci => {
+        const ingredient = ingredients.find(i => i.id === ci.ingredient_id)
+        if (!ingredient) return
+
+        // Calculate multiplier: (added quantity) / (ingredient serving amount)
+        const multiplier = parseFloat(ci.quantity) / ingredient.serving_amount
+
+        totals.calories += ingredient.calories * multiplier
+        totals.protein += ingredient.protein * multiplier
+        totals.carbs += ingredient.carbs * multiplier
+        totals.sugar += (ingredient.sugar || 0) * multiplier
+        totals.fat += ingredient.fat * multiplier
+        totals.fiber += (ingredient.fiber || 0) * multiplier
+      })
+
+      return {
+        calories: totals.calories,
+        protein: totals.protein,
+        carbs: totals.carbs,
+        sugar: totals.sugar > 0 ? totals.sugar : null,
+        fat: totals.fat,
+        fiber: totals.fiber > 0 ? totals.fiber : null
+      }
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!user || loading) return
@@ -206,15 +250,23 @@ export default function EditFood() {
         imageUrl = await uploadImage()
       }
 
-      // Update food
+      // Calculate nutrition from ingredients
+      const nutrition = calculateNutrition()
+
+      // Update food with calculated nutrition
       const { error: updateError } = await supabase
         .from('foods')
         .update({
           name: name.trim(),
           brand_name: brandName.trim() || null,
-          category_id: categoryId,
-          is_composite: foodType === 'composite',
-          ingredient_id: foodType === 'simple' ? selectedIngredientId : null,
+          description: description.trim() || null,
+          category: category.trim(),
+          calories: nutrition.calories,
+          protein: nutrition.protein,
+          carbs: nutrition.carbs,
+          sugar: nutrition.sugar,
+          fat: nutrition.fat,
+          fiber: nutrition.fiber,
           image_url: imageUrl,
         })
         .eq('id', id)
@@ -227,21 +279,26 @@ export default function EditFood() {
         .delete()
         .eq('food_id', id)
 
-      // If composite, insert new food ingredients
-      if (foodType === 'composite' && compositeIngredients.length > 0) {
-        const foodIngredientsData = compositeIngredients.map(ci => ({
-          food_id: id,
-          ingredient_id: ci.ingredient_id,
-          quantity: parseFloat(ci.quantity),
-          unit: ci.unit,
-        }))
+      // Insert food ingredients relationship (for both simple and composite)
+      const foodIngredientsData = foodType === 'simple'
+        ? [{
+            food_id: id,
+            ingredient_id: selectedIngredientId,
+            quantity: 1,
+            unit: 'serving',
+          }]
+        : compositeIngredients.map(ci => ({
+            food_id: id,
+            ingredient_id: ci.ingredient_id,
+            quantity: parseFloat(ci.quantity),
+            unit: ci.unit,
+          }))
 
-        const { error: ingredientsError } = await supabase
-          .from('food_ingredients')
-          .insert(foodIngredientsData)
+      const { error: ingredientsError } = await supabase
+        .from('food_ingredients')
+        .insert(foodIngredientsData)
 
-        if (ingredientsError) throw ingredientsError
-      }
+      if (ingredientsError) throw ingredientsError
 
       navigate('/foods')
     } catch (e: any) {
@@ -327,6 +384,21 @@ export default function EditFood() {
                 />
               </div>
 
+              {/* Description */}
+              <div>
+                <label className="label">
+                  <span className="label-text">Description (Optional)</span>
+                </label>
+                <textarea
+                  className="textarea textarea-bordered w-full"
+                  placeholder="Add any notes about this food..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  disabled={loading}
+                />
+              </div>
+
               {/* Image Upload */}
               <div>
                 <label className="label">
@@ -365,19 +437,21 @@ export default function EditFood() {
                 <label className="label">
                   <span className="label-text">Category</span>
                 </label>
-                <select
-                  className="select select-bordered w-full"
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
+                <input
+                  type="text"
+                  list="food-categories"
+                  className="input input-bordered w-full"
+                  placeholder="e.g., Breakfast, Lunch, Dinner"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
                   required
-                  disabled={loading || categories.length === 0}
-                >
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
+                  disabled={loading}
+                />
+                <datalist id="food-categories">
+                  {FOOD_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat} />
                   ))}
-                </select>
+                </datalist>
               </div>
 
               {/* Food Type */}
