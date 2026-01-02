@@ -23,6 +23,18 @@ interface DailyTotals {
   mealsLogged: number
 }
 
+interface TodayLog {
+  id: string
+  meal_name: string
+  quantity: number
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  consumed_date: string
+  created_at: string
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
@@ -44,6 +56,7 @@ export default function Dashboard() {
     fiber: 0,
     mealsLogged: 0,
   })
+  const [todayLogs, setTodayLogs] = useState<TodayLog[]>([])
 
   useEffect(() => {
     if (user) {
@@ -83,9 +96,10 @@ export default function Dashboard() {
       // Fetch today's consumption - nutrition is saved directly, no joins needed!
       const { data: consumptionData, error } = await supabase
         .from('user_consumption')
-        .select('calories, protein, carbs, fat, sugar, fiber')
+        .select('*')
         .eq('user_id', user?.id)
         .eq('consumed_date', today)
+        .order('created_at', { ascending: false })
 
       if (error) throw error
 
@@ -115,6 +129,9 @@ export default function Dashboard() {
         fiber: Math.round(totalFiber),
         mealsLogged: consumptionData?.length || 0,
       })
+
+      // Set today's logs for Recent Activity
+      setTodayLogs(consumptionData || [])
     } catch (e) {
       console.error('Error fetching totals:', e)
     }
@@ -381,16 +398,37 @@ export default function Dashboard() {
         {/* Recent Activity */}
         <div className="card bg-base-100 shadow-sm">
           <div className="card-body">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold">Recent Activity</h3>
-              <button className="link link-primary text-sm">View All</button>
-            </div>
-            <div className="text-center py-16 opacity-60">
-              <p className="font-medium">No meals logged yet</p>
-              <p className="text-sm mt-1">
-                Start tracking by logging your first meal
-              </p>
-            </div>
+            <h3 className="text-lg font-semibold mb-6">Today's Activity</h3>
+            {todayLogs.length === 0 ? (
+              <div className="text-center py-16 opacity-60">
+                <p className="font-medium">No meals logged today</p>
+                <p className="text-sm mt-1">
+                  Start tracking by logging your first meal
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {todayLogs.map((log) => (
+                  <div key={log.id} className="flex items-center justify-between p-4 bg-base-200 rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-semibold">{log.meal_name}</h4>
+                      <div className="flex gap-4 text-sm opacity-60 mt-1">
+                        <span>{Math.round(log.calories)} kcal</span>
+                        <span>P: {Math.round(log.protein)}g</span>
+                        <span>C: {Math.round(log.carbs)}g</span>
+                        <span>F: {Math.round(log.fat)}g</span>
+                      </div>
+                    </div>
+                    <div className="text-sm opacity-60">
+                      {new Date(log.created_at).toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </main>
