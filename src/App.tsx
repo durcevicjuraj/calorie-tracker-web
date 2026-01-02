@@ -6,6 +6,7 @@ import Ingredients from './pages/Ingredients'
 import Foods from './pages/Foods'
 import Meals from './pages/Meals'
 import Logs from './pages/Logs'
+import History from './pages/History'
 import LogMeal from './pages/LogMeal'
 import AddMeal from './pages/AddMeal'
 import AddFood from './pages/AddFood'
@@ -37,6 +38,7 @@ function App() {
         <Route path="/foods" element={<Foods />} />
         <Route path="/meals" element={<Meals />} />
         <Route path="/logs" element={<Logs />} />
+        <Route path="/history" element={<History />} />
         <Route path="/log-meal" element={<LogMeal />} />
         <Route path="/add-meal" element={<AddMeal />} />
         <Route path="/add-food" element={<AddFood />} />

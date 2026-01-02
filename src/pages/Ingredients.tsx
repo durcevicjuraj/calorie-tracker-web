@@ -73,6 +73,9 @@ export default function Ingredients() {
                 <button onClick={() => navigate('/meals')} className="text-sm font-medium opacity-60 hover:opacity-100 transition">
                   Meals
                 </button>
+                <button onClick={() => navigate('/history')} className="text-sm font-medium opacity-60 hover:opacity-100 transition">
+                  History
+                </button>
               </nav>
 
               {/* Mobile Menu */}
@@ -101,6 +104,11 @@ export default function Ingredients() {
                   <li>
                     <button onClick={() => navigate('/meals')} className="block w-full text-left px-4 py-2 text-sm hover:bg-base-200 rounded">
                       Meals
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => navigate('/history')} className="block w-full text-left px-4 py-2 text-sm hover:bg-base-200 rounded">
+                      History
                     </button>
                   </li>
                 </ul>
