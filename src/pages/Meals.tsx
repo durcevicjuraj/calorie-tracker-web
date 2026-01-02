@@ -23,6 +23,18 @@ export default function Meals() {
   const [meals, setMeals] = useState<Meal[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState<string>('name')
+  const [showNutritionFilters, setShowNutritionFilters] = useState(false)
+
+  // Nutrition range filters
+  const [calorieMin, setCalorieMin] = useState('')
+  const [calorieMax, setCalorieMax] = useState('')
+  const [proteinMin, setProteinMin] = useState('')
+  const [proteinMax, setProteinMax] = useState('')
+  const [carbsMin, setCarbsMin] = useState('')
+  const [carbsMax, setCarbsMax] = useState('')
+  const [fatMin, setFatMin] = useState('')
+  const [fatMax, setFatMax] = useState('')
 
   useEffect(() => {
     fetchMeals()
@@ -44,10 +56,54 @@ export default function Meals() {
     }
   }
 
-  const filteredMeals = meals.filter(meal =>
-    meal.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    meal.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  // Check if any nutrition filters are active
+  const hasNutritionFilters = calorieMin || calorieMax || proteinMin || proteinMax || carbsMin || carbsMax || fatMin || fatMax
+
+  // Filter and sort meals
+  const filteredMeals = meals
+    .filter(meal => {
+      // Text search - includes name and description
+      const matchesSearch = meal.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        meal.description?.toLowerCase().includes(searchQuery.toLowerCase())
+
+      // Nutrition range filters
+      const matchesCalories = (!calorieMin || meal.calories >= parseFloat(calorieMin)) &&
+                              (!calorieMax || meal.calories <= parseFloat(calorieMax))
+      const matchesProtein = (!proteinMin || meal.protein >= parseFloat(proteinMin)) &&
+                             (!proteinMax || meal.protein <= parseFloat(proteinMax))
+      const matchesCarbs = (!carbsMin || meal.carbs >= parseFloat(carbsMin)) &&
+                           (!carbsMax || meal.carbs <= parseFloat(carbsMax))
+      const matchesFat = (!fatMin || meal.fat >= parseFloat(fatMin)) &&
+                         (!fatMax || meal.fat <= parseFloat(fatMax))
+
+      return matchesSearch && matchesCalories && matchesProtein && matchesCarbs && matchesFat
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name)
+        case 'calories-high':
+          return b.calories - a.calories
+        case 'calories-low':
+          return a.calories - b.calories
+        case 'protein-high':
+          return b.protein - a.protein
+        case 'protein-low':
+          return a.protein - b.protein
+        case 'carbs-high':
+          return b.carbs - a.carbs
+        case 'carbs-low':
+          return a.carbs - b.carbs
+        case 'fat-high':
+          return b.fat - a.fat
+        case 'fat-low':
+          return a.fat - b.fat
+        case 'recent':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        default:
+          return 0
+      }
+    })
 
   return (
     <div className="min-h-dvh bg-base-200">
@@ -168,15 +224,231 @@ export default function Meals() {
           </button>
         </div>
 
-        {/* Search */}
-        <div className="mb-6">
-          <input
-            type="text"
-            placeholder="Search meals..."
-            className="input input-bordered w-full max-w-md"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        {/* Search and Filters */}
+        <div className="card bg-base-100 shadow-sm mb-6">
+          <div className="card-body">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Search */}
+              <div>
+                <label className="label">
+                  <span className="label-text">Search</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Search by name or description..."
+                  className="input input-bordered w-full"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              {/* Sort By */}
+              <div>
+                <label className="label">
+                  <span className="label-text">Sort By</span>
+                </label>
+                <select
+                  className="select select-bordered w-full"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                >
+                  <option value="name">Name (A-Z)</option>
+                  <option value="recent">Recently Added</option>
+                  <option value="calories-high">Calories (High-Low)</option>
+                  <option value="calories-low">Calories (Low-High)</option>
+                  <option value="protein-high">Protein (High-Low)</option>
+                  <option value="protein-low">Protein (Low-High)</option>
+                  <option value="carbs-high">Carbs (High-Low)</option>
+                  <option value="carbs-low">Carbs (Low-High)</option>
+                  <option value="fat-high">Fat (High-Low)</option>
+                  <option value="fat-low">Fat (Low-High)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Nutrition Range Filters */}
+            <div className="mt-4">
+              <button
+                className="btn btn-sm btn-outline"
+                onClick={() => setShowNutritionFilters(!showNutritionFilters)}
+              >
+                {showNutritionFilters ? '− Hide' : '+ Show'} Nutrition Filters
+              </button>
+            </div>
+
+            {showNutritionFilters && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                {/* Calories Range */}
+                <div>
+                  <label className="label">
+                    <span className="label-text text-xs">Calories (kcal)</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      className="input input-bordered input-sm w-full"
+                      value={calorieMin}
+                      onChange={(e) => setCalorieMin(e.target.value)}
+                    />
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      className="input input-bordered input-sm w-full"
+                      value={calorieMax}
+                      onChange={(e) => setCalorieMax(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Protein Range */}
+                <div>
+                  <label className="label">
+                    <span className="label-text text-xs">Protein (g)</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      className="input input-bordered input-sm w-full"
+                      value={proteinMin}
+                      onChange={(e) => setProteinMin(e.target.value)}
+                    />
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      className="input input-bordered input-sm w-full"
+                      value={proteinMax}
+                      onChange={(e) => setProteinMax(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Carbs Range */}
+                <div>
+                  <label className="label">
+                    <span className="label-text text-xs">Carbs (g)</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      className="input input-bordered input-sm w-full"
+                      value={carbsMin}
+                      onChange={(e) => setCarbsMin(e.target.value)}
+                    />
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      className="input input-bordered input-sm w-full"
+                      value={carbsMax}
+                      onChange={(e) => setCarbsMax(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Fat Range */}
+                <div>
+                  <label className="label">
+                    <span className="label-text text-xs">Fat (g)</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      className="input input-bordered input-sm w-full"
+                      value={fatMin}
+                      onChange={(e) => setFatMin(e.target.value)}
+                    />
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      className="input input-bordered input-sm w-full"
+                      value={fatMax}
+                      onChange={(e) => setFatMax(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Active Filters Display */}
+            {(searchQuery || hasNutritionFilters) && (
+              <div className="flex gap-2 mt-4 flex-wrap">
+                <span className="text-sm opacity-60">Active filters:</span>
+                {searchQuery && (
+                  <div className="badge badge-primary gap-2">
+                    Search: {searchQuery}
+                    <button onClick={() => setSearchQuery('')} className="btn btn-ghost btn-xs">✕</button>
+                  </div>
+                )}
+                {calorieMin && (
+                  <div className="badge badge-secondary gap-2">
+                    Calories ≥ {calorieMin}
+                    <button onClick={() => setCalorieMin('')} className="btn btn-ghost btn-xs">✕</button>
+                  </div>
+                )}
+                {calorieMax && (
+                  <div className="badge badge-secondary gap-2">
+                    Calories ≤ {calorieMax}
+                    <button onClick={() => setCalorieMax('')} className="btn btn-ghost btn-xs">✕</button>
+                  </div>
+                )}
+                {proteinMin && (
+                  <div className="badge badge-secondary gap-2">
+                    Protein ≥ {proteinMin}g
+                    <button onClick={() => setProteinMin('')} className="btn btn-ghost btn-xs">✕</button>
+                  </div>
+                )}
+                {proteinMax && (
+                  <div className="badge badge-secondary gap-2">
+                    Protein ≤ {proteinMax}g
+                    <button onClick={() => setProteinMax('')} className="btn btn-ghost btn-xs">✕</button>
+                  </div>
+                )}
+                {carbsMin && (
+                  <div className="badge badge-secondary gap-2">
+                    Carbs ≥ {carbsMin}g
+                    <button onClick={() => setCarbsMin('')} className="btn btn-ghost btn-xs">✕</button>
+                  </div>
+                )}
+                {carbsMax && (
+                  <div className="badge badge-secondary gap-2">
+                    Carbs ≤ {carbsMax}g
+                    <button onClick={() => setCarbsMax('')} className="btn btn-ghost btn-xs">✕</button>
+                  </div>
+                )}
+                {fatMin && (
+                  <div className="badge badge-secondary gap-2">
+                    Fat ≥ {fatMin}g
+                    <button onClick={() => setFatMin('')} className="btn btn-ghost btn-xs">✕</button>
+                  </div>
+                )}
+                {fatMax && (
+                  <div className="badge badge-secondary gap-2">
+                    Fat ≤ {fatMax}g
+                    <button onClick={() => setFatMax('')} className="btn btn-ghost btn-xs">✕</button>
+                  </div>
+                )}
+                <button
+                  className="btn btn-ghost btn-xs"
+                  onClick={() => {
+                    setSearchQuery('')
+                    setCalorieMin('')
+                    setCalorieMax('')
+                    setProteinMin('')
+                    setProteinMax('')
+                    setCarbsMin('')
+                    setCarbsMax('')
+                    setFatMin('')
+                    setFatMax('')
+                  }}
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Meals List */}
