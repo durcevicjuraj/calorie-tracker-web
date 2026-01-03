@@ -35,6 +35,14 @@ interface TodayLog {
   created_at: string
 }
 
+interface DayProgress {
+  day: number
+  caloriesGoal: number
+  proteinGoal: number
+  caloriesConsumed: number
+  proteinConsumed: number
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
@@ -57,11 +65,13 @@ export default function Dashboard() {
     mealsLogged: 0,
   })
   const [todayLogs, setTodayLogs] = useState<TodayLog[]>([])
+  const [monthlyProgress, setMonthlyProgress] = useState<DayProgress[]>([])
 
   useEffect(() => {
     if (user) {
       fetchGoals()
       fetchTodaysTotals()
+      fetchMonthlyProgress()
     }
   }, [user])
 
@@ -134,6 +144,84 @@ export default function Dashboard() {
       setTodayLogs(consumptionData || [])
     } catch (e) {
       console.error('Error fetching totals:', e)
+    }
+  }
+
+  async function fetchMonthlyProgress() {
+    try {
+      // Get first and last day of current month
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = now.getMonth()
+      const firstDay = new Date(year, month, 1)
+      const lastDay = new Date(year, month + 1, 0)
+      const daysInMonth = lastDay.getDate()
+
+      const firstDayStr = firstDay.toISOString().split('T')[0]
+      const lastDayStr = lastDay.toISOString().split('T')[0]
+
+      // Fetch snapshots for current month
+      const { data: snapshots, error } = await supabase
+        .from('daily_nutrition_snapshots')
+        .select('*')
+        .eq('user_id', user?.id)
+        .gte('log_date', firstDayStr)
+        .lte('log_date', lastDayStr)
+        .order('log_date')
+
+      if (error) throw error
+
+      // Create array for all days in month
+      const progressData: DayProgress[] = []
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = new Date(year, month, day).toISOString().split('T')[0]
+        const snapshot = snapshots?.find(s => s.log_date === dateStr)
+
+        if (snapshot) {
+          progressData.push({
+            day,
+            caloriesGoal: snapshot.calories_goal,
+            proteinGoal: snapshot.protein_goal,
+            caloriesConsumed: snapshot.calories_consumed,
+            proteinConsumed: snapshot.protein_consumed,
+          })
+        } else {
+          // Day hasn't been logged yet - use current goals
+          progressData.push({
+            day,
+            caloriesGoal: goals.calories,
+            proteinGoal: goals.protein,
+            caloriesConsumed: 0,
+            proteinConsumed: 0,
+          })
+        }
+      }
+
+      setMonthlyProgress(progressData)
+    } catch (e) {
+      console.error('Error fetching monthly progress:', e)
+    }
+  }
+
+  function getDayColor(day: DayProgress): string {
+    const today = new Date().getDate()
+    const currentMonth = new Date().getMonth()
+    const progressMonth = new Date().getMonth()
+
+    // Don't show color for future days
+    if (currentMonth === progressMonth && day.day > today) {
+      return 'bg-base-300 opacity-30'
+    }
+
+    const caloriesMet = day.caloriesConsumed >= day.caloriesGoal
+    const proteinMet = day.proteinConsumed >= day.proteinGoal
+
+    if (caloriesMet && proteinMet) {
+      return 'bg-success' // Bright green
+    } else if (caloriesMet || proteinMet) {
+      return 'bg-success opacity-50' // Dark green
+    } else {
+      return 'bg-base-300' // Gray
     }
   }
 
@@ -391,6 +479,52 @@ export default function Dashboard() {
               >
                 Set Goals
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Monthly Progress */}
+        <div className="card bg-base-100 shadow-sm mb-8">
+          <div className="card-body">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">
+                  {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} Progress
+                </h3>
+                <p className="text-xs opacity-60 mt-1">Daily goal completion tracker</p>
+              </div>
+              <div className="flex gap-3 text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-success rounded"></div>
+                  <span className="opacity-60">Both goals</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-success opacity-50 rounded"></div>
+                  <span className="opacity-60">One goal</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-base-300 rounded"></div>
+                  <span className="opacity-60">None</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="w-fit">
+              <div className="grid grid-cols-7 gap-1">
+                {monthlyProgress.map((dayData) => (
+                  <div
+                    key={dayData.day}
+                    className="tooltip"
+                    data-tip={`Day ${dayData.day}: ${Math.round(dayData.caloriesConsumed)}/${dayData.caloriesGoal} kcal, ${Math.round(dayData.proteinConsumed)}/${dayData.proteinGoal}g protein`}
+                  >
+                    <div
+                      className={`w-8 h-8 rounded flex items-center justify-center text-[10px] font-medium cursor-pointer hover:ring-1 hover:ring-primary transition ${getDayColor(dayData)}`}
+                    >
+                      {dayData.day}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
