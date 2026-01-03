@@ -9,6 +9,7 @@ interface Ingredient {
   id: string
   name: string
   brand_name: string | null
+  category: string
   serving_amount: number
   serving_unit: string
   calories: number
@@ -17,6 +18,7 @@ interface Ingredient {
   sugar: number | null
   fat: number
   fiber: number | null
+  image_url: string | null
 }
 
 interface FoodIngredient {
@@ -48,6 +50,12 @@ export default function EditFood() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
 
+  // Ingredient search and filter states
+  const [ingredientSearchQuery, setIngredientSearchQuery] = useState('')
+  const [ingredientCategoryFilter, setIngredientCategoryFilter] = useState<string>('all')
+  const [showIngredientSelector, setShowIngredientSelector] = useState(false)
+  const [compositeEditIndex, setCompositeEditIndex] = useState<number | null>(null)
+
   const servingUnits = ['g', 'ml', 'cup', 'piece', 'tbsp', 'tsp', 'oz', 'lb', 'serving']
 
   useEffect(() => {
@@ -57,11 +65,34 @@ export default function EditFood() {
     }
   }, [id])
 
+  // Auto-fill image from ingredient when ingredient is selected (for simple foods)
+  useEffect(() => {
+    if (foodType === 'simple' && selectedIngredientId) {
+      const ingredient = ingredients.find(i => i.id === selectedIngredientId)
+      if (ingredient) {
+        // Auto-set image from ingredient if user hasn't uploaded a custom image
+        if (!imageFile && ingredient.image_url && !existingImageUrl) {
+          setImagePreview(ingredient.image_url)
+        }
+      }
+    }
+  }, [selectedIngredientId, foodType, ingredients, imageFile, existingImageUrl])
+
+  // Clear inherited image when switching to composite
+  useEffect(() => {
+    if (foodType === 'composite') {
+      // Clear inherited image when switching to composite
+      if (!imageFile && !existingImageUrl) {
+        setImagePreview(null)
+      }
+    }
+  }, [foodType, imageFile, existingImageUrl])
+
   async function fetchIngredients() {
     try {
       const { data, error } = await supabase
         .from('ingredients')
-        .select('id, name, brand_name, serving_amount, serving_unit, calories, protein, carbs, sugar, fat, fiber')
+        .select('id, name, brand_name, category, serving_amount, serving_unit, calories, protein, carbs, sugar, fat, fiber, image_url')
         .order('name')
 
       if (error) throw error
@@ -69,6 +100,42 @@ export default function EditFood() {
     } catch (e: any) {
       console.error('Error fetching ingredients:', e)
     }
+  }
+
+  // Get unique ingredient categories
+  const ingredientCategories = ['all', ...new Set(ingredients.map(i => i.category || 'Uncategorized'))]
+
+  // Filter ingredients for the selector
+  const filteredIngredients = ingredients.filter(ingredient => {
+    const matchesSearch = ingredient.name.toLowerCase().includes(ingredientSearchQuery.toLowerCase()) ||
+      ingredient.brand_name?.toLowerCase().includes(ingredientSearchQuery.toLowerCase())
+    const matchesCategory = ingredientCategoryFilter === 'all' || ingredient.category === ingredientCategoryFilter
+    return matchesSearch && matchesCategory
+  })
+
+  function selectIngredient(ingredientId: string) {
+    if (foodType === 'simple') {
+      setSelectedIngredientId(ingredientId)
+    } else if (compositeEditIndex !== null) {
+      // Editing existing ingredient in composite food
+      updateCompositeIngredient(compositeEditIndex, 'ingredient_id', ingredientId)
+      setCompositeEditIndex(null)
+    } else {
+      // Adding new ingredient to composite food
+      setCompositeIngredients([...compositeIngredients, {
+        ingredient_id: ingredientId,
+        quantity: '1',
+        unit: 'g'
+      }])
+    }
+    setShowIngredientSelector(false)
+    setIngredientSearchQuery('')
+    setIngredientCategoryFilter('all')
+  }
+
+  function openIngredientSelectorForComposite(index: number | null = null) {
+    setCompositeEditIndex(index)
+    setShowIngredientSelector(true)
   }
 
   async function fetchFood() {
@@ -250,10 +317,16 @@ export default function EditFood() {
     setError(null)
 
     try {
-      // Upload new image if present, otherwise keep existing
+      // Upload new image if present, use ingredient image for simple foods, or keep existing
       let imageUrl: string | null = existingImageUrl
       if (imageFile) {
         imageUrl = await uploadImage()
+      } else if (foodType === 'simple' && selectedIngredientId && !imageFile) {
+        // For simple foods, use the ingredient's image if no custom image is uploaded
+        const ingredient = ingredients.find(i => i.id === selectedIngredientId)
+        if (ingredient?.image_url) {
+          imageUrl = ingredient.image_url
+        }
       }
 
       // Calculate nutrition from ingredients
@@ -427,7 +500,9 @@ export default function EditFood() {
               <div>
                 <label className="label">
                   <span className="label-text">Food Image (Optional)</span>
-                  <span className="label-text-alt opacity-60">Will be downscaled to 800px</span>
+                  <span className="label-text-alt opacity-60">
+                    {foodType === 'simple' ? 'Uses ingredient image by default' : 'Will be downscaled to 800px'}
+                  </span>
                 </label>
                 {imagePreview ? (
                   <div className="relative">
@@ -436,6 +511,11 @@ export default function EditFood() {
                       alt="Preview"
                       className="w-full h-48 object-cover rounded-lg border border-base-300"
                     />
+                    {!imageFile && !existingImageUrl && foodType === 'simple' && (
+                      <div className="badge badge-primary absolute top-2 left-2">
+                        From ingredient
+                      </div>
+                    )}
                     <button
                       type="button"
                       className="btn btn-circle btn-sm absolute top-2 right-2"
@@ -513,19 +593,60 @@ export default function EditFood() {
                   <label className="label">
                     <span className="label-text">Select Ingredient</span>
                   </label>
-                  <select
-                    className="select select-bordered w-full"
-                    value={selectedIngredientId}
-                    onChange={(e) => setSelectedIngredientId(e.target.value)}
-                    required
-                    disabled={loading || ingredients.length === 0}
-                  >
-                    {ingredients.map((ingredient) => (
-                      <option key={ingredient.id} value={ingredient.id}>
-                        {ingredient.name} {ingredient.brand_name ? `(${ingredient.brand_name})` : ''}
-                      </option>
-                    ))}
-                  </select>
+
+                  {/* Selected Ingredient Display */}
+                  {selectedIngredientId && ingredients.find(i => i.id === selectedIngredientId) && (
+                    <div className="card bg-base-200 shadow-sm mb-3">
+                      <div className="card-body p-4">
+                        <div className="flex items-center gap-4">
+                          {ingredients.find(i => i.id === selectedIngredientId)?.image_url ? (
+                            <img
+                              src={ingredients.find(i => i.id === selectedIngredientId)!.image_url!}
+                              alt={ingredients.find(i => i.id === selectedIngredientId)!.name}
+                              className="w-16 h-16 object-cover rounded"
+                            />
+                          ) : (
+                            <div className="w-16 h-16 bg-base-300 rounded flex items-center justify-center">
+                              <span className="text-2xl">🍽️</span>
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <h4 className="font-semibold">
+                              {ingredients.find(i => i.id === selectedIngredientId)!.name}
+                              {ingredients.find(i => i.id === selectedIngredientId)?.brand_name && (
+                                <span className="text-sm opacity-60 ml-2">({ingredients.find(i => i.id === selectedIngredientId)!.brand_name})</span>
+                              )}
+                            </h4>
+                            <p className="text-xs opacity-60">
+                              {ingredients.find(i => i.id === selectedIngredientId)!.calories} kcal •
+                              P: {ingredients.find(i => i.id === selectedIngredientId)!.protein}g •
+                              C: {ingredients.find(i => i.id === selectedIngredientId)!.carbs}g •
+                              F: {ingredients.find(i => i.id === selectedIngredientId)!.fat}g
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline"
+                            onClick={() => setShowIngredientSelector(true)}
+                          >
+                            Change
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {!selectedIngredientId && (
+                    <button
+                      type="button"
+                      className="btn btn-outline w-full"
+                      onClick={() => setShowIngredientSelector(true)}
+                      disabled={ingredients.length === 0}
+                    >
+                      Select Ingredient
+                    </button>
+                  )}
+
                   {ingredients.length === 0 && (
                     <p className="text-sm opacity-60 mt-2">
                       No ingredients available. Add ingredients first.
@@ -540,57 +661,85 @@ export default function EditFood() {
                   <label className="label">
                     <span className="label-text">Ingredients</span>
                   </label>
-                  {compositeIngredients.map((ci, index) => (
-                    <div key={index} className="flex gap-2 mb-2">
-                      <select
-                        className="select select-bordered flex-1"
-                        value={ci.ingredient_id}
-                        onChange={(e) => updateCompositeIngredient(index, 'ingredient_id', e.target.value)}
-                        required
-                        disabled={loading}
-                      >
-                        {ingredients.map((ingredient) => (
-                          <option key={ingredient.id} value={ingredient.id}>
-                            {ingredient.name} {ingredient.brand_name ? `(${ingredient.brand_name})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        step="0.1"
-                        className="input input-bordered w-24"
-                        value={ci.quantity}
-                        onChange={(e) => updateCompositeIngredient(index, 'quantity', e.target.value)}
-                        required
-                        min="0"
-                        disabled={loading}
-                      />
-                      <select
-                        className="select select-bordered w-24"
-                        value={ci.unit}
-                        onChange={(e) => updateCompositeIngredient(index, 'unit', e.target.value)}
-                        disabled={loading}
-                      >
-                        {servingUnits.map((unit) => (
-                          <option key={unit} value={unit}>
-                            {unit}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        className="btn btn-square btn-outline btn-error"
-                        onClick={() => removeCompositeIngredient(index)}
-                        disabled={loading}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
+
+                  {/* Composite Ingredients List */}
+                  <div className="space-y-2 mb-3">
+                    {compositeIngredients.map((ci, index) => {
+                      const ingredient = ingredients.find(i => i.id === ci.ingredient_id)
+                      return (
+                        <div key={index} className="card bg-base-200 shadow-sm">
+                          <div className="card-body p-3">
+                            <div className="flex items-center gap-3">
+                              {ingredient?.image_url ? (
+                                <img
+                                  src={ingredient.image_url}
+                                  alt={ingredient.name}
+                                  className="w-12 h-12 object-cover rounded"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 bg-base-300 rounded flex items-center justify-center flex-shrink-0">
+                                  <span className="text-xl">🍽️</span>
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-sm truncate">
+                                  {ingredient?.name || 'Unknown'}
+                                </h4>
+                                {ingredient?.brand_name && (
+                                  <p className="text-xs opacity-60 truncate">{ingredient.brand_name}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  className="input input-bordered input-sm w-20"
+                                  value={ci.quantity}
+                                  onChange={(e) => updateCompositeIngredient(index, 'quantity', e.target.value)}
+                                  required
+                                  min="0"
+                                  disabled={loading}
+                                />
+                                <select
+                                  className="select select-bordered select-sm w-20"
+                                  value={ci.unit}
+                                  onChange={(e) => updateCompositeIngredient(index, 'unit', e.target.value)}
+                                  disabled={loading}
+                                >
+                                  {servingUnits.map((unit) => (
+                                    <option key={unit} value={unit}>
+                                      {unit}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline"
+                                  onClick={() => openIngredientSelectorForComposite(index)}
+                                  disabled={loading}
+                                >
+                                  Change
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-square btn-outline btn-error"
+                                  onClick={() => removeCompositeIngredient(index)}
+                                  disabled={loading}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
                   <button
                     type="button"
-                    className="btn btn-outline btn-sm mt-2"
-                    onClick={addCompositeIngredient}
+                    className="btn btn-outline btn-sm"
+                    onClick={() => openIngredientSelectorForComposite(null)}
                     disabled={loading || ingredients.length === 0}
                   >
                     + Add Ingredient
@@ -600,6 +749,108 @@ export default function EditFood() {
                       No ingredients available. Add ingredients first.
                     </p>
                   )}
+                </div>
+              )}
+
+              {/* Ingredient Selector Modal - Shared by both Simple and Composite */}
+              {showIngredientSelector && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                  <div className="card bg-base-100 shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+                    <div className="card-body">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-xl font-bold">Select Ingredient</h3>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-ghost btn-circle"
+                          onClick={() => {
+                            setShowIngredientSelector(false)
+                            setIngredientSearchQuery('')
+                            setIngredientCategoryFilter('all')
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      {/* Search and Filters */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                        <input
+                          type="text"
+                          placeholder="Search ingredients..."
+                          className="input input-bordered input-sm w-full"
+                          value={ingredientSearchQuery}
+                          onChange={(e) => setIngredientSearchQuery(e.target.value)}
+                        />
+                        <select
+                          className="select select-bordered select-sm w-full"
+                          value={ingredientCategoryFilter}
+                          onChange={(e) => setIngredientCategoryFilter(e.target.value)}
+                        >
+                          {ingredientCategories.map(cat => (
+                            <option key={cat} value={cat}>
+                              {cat === 'all' ? 'All Categories' : cat}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Ingredients Grid */}
+                      <div className="overflow-y-auto max-h-[60vh]">
+                        {filteredIngredients.length === 0 ? (
+                          <div className="text-center py-12 opacity-60">
+                            <p>No ingredients found</p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {filteredIngredients.map((ingredient) => (
+                              <div
+                                key={ingredient.id}
+                                className={`card bg-base-200 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${
+                                  selectedIngredientId === ingredient.id ? 'ring-2 ring-primary' : ''
+                                }`}
+                                onClick={() => selectIngredient(ingredient.id)}
+                              >
+                                <div className="card-body p-3">
+                                  <div className="flex gap-3">
+                                    {ingredient.image_url ? (
+                                      <img
+                                        src={ingredient.image_url}
+                                        alt={ingredient.name}
+                                        className="w-16 h-16 object-cover rounded"
+                                      />
+                                    ) : (
+                                      <div className="w-16 h-16 bg-base-300 rounded flex items-center justify-center flex-shrink-0">
+                                        <span className="text-2xl">🍽️</span>
+                                      </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="font-semibold text-sm truncate">
+                                        {ingredient.name}
+                                      </h4>
+                                      {ingredient.brand_name && (
+                                        <p className="text-xs opacity-60 truncate">{ingredient.brand_name}</p>
+                                      )}
+                                      <p className="text-xs opacity-60 mt-1">
+                                        {ingredient.serving_amount}{ingredient.serving_unit}
+                                      </p>
+                                      <div className="text-xs opacity-60 mt-1">
+                                        <div>{ingredient.calories} kcal</div>
+                                        <div className="flex gap-2">
+                                          <span>P:{ingredient.protein}g</span>
+                                          <span>C:{ingredient.carbs}g</span>
+                                          <span>F:{ingredient.fat}g</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
