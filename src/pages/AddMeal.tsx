@@ -141,12 +141,6 @@ export default function AddMeal() {
     return units
   }
 
-  function addMealFood() {
-    if (foods.length > 0) {
-      setMealFoods([...mealFoods, { food_id: foods[0].id, quantity: '1', unit: 'servings' }])
-    }
-  }
-
   function removeMealFood(index: number) {
     setMealFoods(mealFoods.filter((_, i) => i !== index))
   }

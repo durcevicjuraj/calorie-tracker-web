@@ -241,10 +241,6 @@ export default function EditFood() {
     }
   }
 
-  function addCompositeIngredient() {
-    setCompositeIngredients([...compositeIngredients, { ingredient_id: ingredients[0]?.id || '', quantity: '100', unit: 'g' }])
-  }
-
   function removeCompositeIngredient(index: number) {
     setCompositeIngredients(compositeIngredients.filter((_, i) => i !== index))
   }
