@@ -174,7 +174,8 @@ export default function Dashboard() {
       // Create array for all days in month
       const progressData: DayProgress[] = []
       for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = new Date(year, month, day).toISOString().split('T')[0]
+        // Format date string without timezone conversion to avoid off-by-one errors
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
         const snapshot = snapshots?.find(s => s.log_date === dateStr)
 
         if (snapshot) {
@@ -203,7 +204,7 @@ export default function Dashboard() {
     }
   }
 
-  function getDayColor(day: DayProgress): string {
+  function getCaloriesDayColor(day: DayProgress): string {
     const today = new Date().getDate()
     const currentMonth = new Date().getMonth()
     const progressMonth = new Date().getMonth()
@@ -213,16 +214,52 @@ export default function Dashboard() {
       return 'bg-base-300 opacity-30'
     }
 
-    const caloriesMet = day.caloriesConsumed >= day.caloriesGoal
-    const proteinMet = day.proteinConsumed >= day.proteinGoal
+    const consumed = day.caloriesConsumed
+    const goal = day.caloriesGoal
 
-    if (caloriesMet && proteinMet) {
-      return 'bg-success' // Bright green
-    } else if (caloriesMet || proteinMet) {
-      return 'bg-success opacity-50' // Dark green
-    } else {
-      return 'bg-base-300' // Gray
+    // Red: 100+ calories above goal
+    if (consumed >= goal + 100) {
+      return 'bg-error'
     }
+    // Green: Met goal (but not excessively over)
+    if (consumed >= goal) {
+      return 'bg-success'
+    }
+    // Orange: 0-15% below goal
+    if (consumed >= goal * 0.85) {
+      return 'bg-orange-500'
+    }
+    // Gray: More than 15% below goal
+    return 'bg-base-300'
+  }
+
+  function getProteinDayColor(day: DayProgress): string {
+    const today = new Date().getDate()
+    const currentMonth = new Date().getMonth()
+    const progressMonth = new Date().getMonth()
+
+    // Don't show color for future days
+    if (currentMonth === progressMonth && day.day > today) {
+      return 'bg-base-300 opacity-30'
+    }
+
+    const consumed = day.proteinConsumed
+    const goal = day.proteinGoal
+
+    // Red: 15%+ above goal
+    if (consumed >= goal * 1.15) {
+      return 'bg-error'
+    }
+    // Green: Met goal (but not excessively over)
+    if (consumed >= goal) {
+      return 'bg-success'
+    }
+    // Orange: 0-15% below goal
+    if (consumed >= goal * 0.85) {
+      return 'bg-orange-500'
+    }
+    // Gray: More than 15% below goal
+    return 'bg-base-300'
   }
 
   return (
@@ -493,37 +530,69 @@ export default function Dashboard() {
                 </h3>
                 <p className="text-xs opacity-60 mt-1">Daily goal completion tracker</p>
               </div>
-              <div className="flex gap-3 text-xs">
+              <div className="flex gap-3 text-xs flex-wrap">
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 bg-success rounded"></div>
-                  <span className="opacity-60">Both goals</span>
+                  <span className="opacity-60">Goal met</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 bg-success opacity-50 rounded"></div>
-                  <span className="opacity-60">One goal</span>
+                  <div className="w-3 h-3 bg-orange-500 rounded"></div>
+                  <span className="opacity-60">Slightly below</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-error rounded"></div>
+                  <span className="opacity-60">Too high</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 bg-base-300 rounded"></div>
-                  <span className="opacity-60">None</span>
+                  <span className="opacity-60">Way below</span>
                 </div>
               </div>
             </div>
 
-            <div className="w-fit">
-              <div className="grid grid-cols-7 gap-1">
-                {monthlyProgress.map((dayData) => (
-                  <div
-                    key={dayData.day}
-                    className="tooltip"
-                    data-tip={`Day ${dayData.day}: ${Math.round(dayData.caloriesConsumed)}/${dayData.caloriesGoal} kcal, ${Math.round(dayData.proteinConsumed)}/${dayData.proteinGoal}g protein`}
-                  >
-                    <div
-                      className={`w-8 h-8 rounded flex items-center justify-center text-[10px] font-medium cursor-pointer hover:ring-1 hover:ring-primary transition ${getDayColor(dayData)}`}
-                    >
-                      {dayData.day}
-                    </div>
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Calories Grid */}
+              <div>
+                <h4 className="text-sm font-medium mb-2 opacity-60">Calories</h4>
+                <div className="w-fit">
+                  <div className="grid grid-cols-7 gap-1">
+                    {monthlyProgress.map((dayData) => (
+                      <div
+                        key={dayData.day}
+                        className="tooltip"
+                        data-tip={`Day ${dayData.day}: ${Math.round(dayData.caloriesConsumed)}/${dayData.caloriesGoal} kcal`}
+                      >
+                        <div
+                          className={`w-8 h-8 rounded flex items-center justify-center text-[10px] font-medium cursor-pointer hover:ring-1 hover:ring-primary transition ${getCaloriesDayColor(dayData)}`}
+                        >
+                          {dayData.day}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+              </div>
+
+              {/* Protein Grid */}
+              <div>
+                <h4 className="text-sm font-medium mb-2 opacity-60">Protein</h4>
+                <div className="w-fit">
+                  <div className="grid grid-cols-7 gap-1">
+                    {monthlyProgress.map((dayData) => (
+                      <div
+                        key={dayData.day}
+                        className="tooltip"
+                        data-tip={`Day ${dayData.day}: ${Math.round(dayData.proteinConsumed)}/${dayData.proteinGoal}g protein`}
+                      >
+                        <div
+                          className={`w-8 h-8 rounded flex items-center justify-center text-[10px] font-medium cursor-pointer hover:ring-1 hover:ring-primary transition ${getProteinDayColor(dayData)}`}
+                        >
+                          {dayData.day}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
