@@ -47,6 +47,9 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false)
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('theme') || 'dark'
+  })
   const [goals, setGoals] = useState<UserGoals>({
     calories: 2000,
     protein: 150,
@@ -66,6 +69,12 @@ export default function Dashboard() {
   })
   const [todayLogs, setTodayLogs] = useState<TodayLog[]>([])
   const [monthlyProgress, setMonthlyProgress] = useState<DayProgress[]>([])
+
+  useEffect(() => {
+    // Apply theme to document
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('theme', theme)
+  }, [theme])
 
   useEffect(() => {
     if (user) {
@@ -288,6 +297,66 @@ export default function Dashboard() {
                   History
                 </button>
               </nav>
+
+              {/* Theme Selector */}
+              <div className="dropdown dropdown-end">
+                <div tabIndex={0} role="button" className="btn btn-ghost btn-sm gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
+                  </svg>
+                  <span className="hidden sm:inline">Theme</span>
+                </div>
+                <ul tabIndex={0} className="mt-3 z-[1] p-2 shadow-lg dropdown-content bg-base-100 rounded-lg w-52 border border-base-300">
+                  <li>
+                    <button
+                      onClick={() => setTheme('light')}
+                      className={`block w-full text-left px-4 py-2 text-sm hover:bg-base-200 rounded ${theme === 'light' ? 'bg-base-200 font-semibold' : ''}`}
+                    >
+                      Light
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => setTheme('dark')}
+                      className={`block w-full text-left px-4 py-2 text-sm hover:bg-base-200 rounded ${theme === 'dark' ? 'bg-base-200 font-semibold' : ''}`}
+                    >
+                      Dark
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => setTheme('cupcake')}
+                      className={`block w-full text-left px-4 py-2 text-sm hover:bg-base-200 rounded ${theme === 'cupcake' ? 'bg-base-200 font-semibold' : ''}`}
+                    >
+                      Cupcake
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => setTheme('forest')}
+                      className={`block w-full text-left px-4 py-2 text-sm hover:bg-base-200 rounded ${theme === 'forest' ? 'bg-base-200 font-semibold' : ''}`}
+                    >
+                      Forest
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => setTheme('synthwave')}
+                      className={`block w-full text-left px-4 py-2 text-sm hover:bg-base-200 rounded ${theme === 'synthwave' ? 'bg-base-200 font-semibold' : ''}`}
+                    >
+                      Synthwave
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => setTheme('valentine')}
+                      className={`block w-full text-left px-4 py-2 text-sm hover:bg-base-200 rounded ${theme === 'valentine' ? 'bg-base-200 font-semibold' : ''}`}
+                    >
+                      Valentine
+                    </button>
+                  </li>
+                </ul>
+              </div>
 
               {/* Mobile Menu */}
               <div className="dropdown dropdown-end md:hidden">
